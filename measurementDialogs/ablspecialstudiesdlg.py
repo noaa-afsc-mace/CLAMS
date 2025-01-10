@@ -1,5 +1,5 @@
 """
-updated November 2022 to PyQt6 and Python 3 by Alicia Billings, NWFSC
+updated December 2024 to PyQt6 and Python 3 by Alicia Billings, NWFSC
 specific updates:
 - PyQt import statement
 - signal/slot connections
@@ -11,7 +11,7 @@ specific updates:
 """
 
 from PyQt6.QtWidgets import *
-from ui.xga import ui_ABLSpecialStudiesDlg
+from ui import ui_ABLSpecialStudiesDlg
 from sys import argv
 
 

@@ -2,7 +2,7 @@
 Adapted from finclipyesnodlg.py for use by NWFSC
 Keeps track of whether a salmon has an adipose fin or not
 
-updated November 2022 to PyQt6 and Python 3 by Alicia Billings, NWFSC
+updated January 2025 to PyQt6 and Python 3 by Alicia Billings, NWFSC
 specific updates:
 - PyQt import statement
 - changed order of functions to put setup first
@@ -12,7 +12,7 @@ specific updates:
 """
 
 from PyQt6.QtWidgets import *
-from ui.xga import ui_YesNoDlg
+from ui import ui_YesNoDlg
 from sys import argv
 
 
@@ -65,7 +65,7 @@ class AdiposeYesNoDlg(QDialog, ui_YesNoDlg.Ui_YesNoDlg):
         self.reject()
 
 
-#"""
+"""
 if __name__ == "__main__":
     #  create an instance of QApplication
     app = QApplication(argv)
@@ -75,4 +75,4 @@ if __name__ == "__main__":
     form.show()
     #  and start the application...
     app.exec()
-#"""
+"""

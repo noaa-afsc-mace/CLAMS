@@ -5,7 +5,7 @@ created by: Alicia Billings - alicia.billings@noaa.gov
 date: April 2019
 notes:
 
-updated November 2022 to PyQt6 and Python 3 by Alicia Billings, NWFSC
+updated January 2025 to PyQt6 and Python 3 by Alicia Billings, NWFSC
 specific updates:
 - PyQt import statement
 - added some function explanation
@@ -14,7 +14,7 @@ specific updates:
 """
 
 from PyQt6.QtWidgets import *
-from ui.xga import ui_ClipDlg
+from ui import ui_ClipDlg
 from sys import argv
 import numpad
 
