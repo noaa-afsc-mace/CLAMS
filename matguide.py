@@ -26,10 +26,12 @@ class MatGuide(QDialog, ui_MatGuide.Ui_matGuide):
 
         sql = ("SELECT parameter_value FROM species_data WHERE lower(species_parameter)='maturity_table' "+
                 "AND species_code="+self.speciesCode)
+        query = self.db.dbQuery(sql)
         maturityTable, = query.first()
         self.maturityTable=maturityTable
 
-        self.spcLabel.setText(self.speciesName)
+
+        self.picLabel.setText(self.speciesName)
         self.matTabLabel.setText(self.maturityTable)
         sql = ("SELECT button_text, description_text_male, description_text_female FROM " +
                 "maturity_description WHERE maturity_table="+self.maturityTable+" ORDER BY maturity_key")
@@ -71,20 +73,20 @@ class MatGuide(QDialog, ui_MatGuide.Ui_matGuide):
         self.maleBtn.clicked.connect(self.getMat)
         self.femaleBtn.clicked.connect(self.getMat)
 
-        screen=QDesktopWidget().screenGeometry()
-        window=self.geometry()
-        self.setGeometry((screen.width()-window.width())/2, self.settings['WindowAnchor']-
-                window.height(), window.width(), window.height())
-        self.setMinimumSize(window.width(), window.height())
-        self.setMaximumSize(window.width(), window.height())
+       # screen=QDesktop().screenGeometry()
+       # window=self.geometry()
+       # self.setGeometry((screen.width()-window.width())/2, self.settings['WindowAnchor']-
+       #         window.height(), window.width(), window.height())
+       # self.setMinimumSize(window.width(), window.height())
+       # self.setMaximumSize(window.width(), window.height())
 
 
     def getMat(self):
         matStage=-1
         for i in range(8):
             exec(str("button=self.mat"+str(i+1)+"Btn.isChecked()"))
-            if button:
-                matStage=i
+          #  if button:
+          #      matStage=i
         if matStage<0:# no maturity has been selected
             return
         self.dispImages=[]
