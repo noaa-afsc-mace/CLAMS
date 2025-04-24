@@ -13,7 +13,7 @@ todo: couldn't check because need parent dialog set up first to connect to datab
 
 from PyQt6.QtWidgets import *
 from PyQt6.QtSql import QSqlQuery
-from ui.xga import ui_ExtendedSampleCollection
+from ui import ui_ExtendedSampleCollection
 from sys import argv
 
 

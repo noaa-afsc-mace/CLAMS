@@ -103,6 +103,7 @@ class NetDlg(QDialog, ui_NetDlg.Ui_netDlg):
                 self.survey + " AND event_id=" + self.activeEvent + " AND measurement_type " +
                 "IN('NetVerticalOpening','NetHorizontalOpening','HeadRopeDepth'," +
                 "'TrawlWireOut') GROUP BY time_stamp ORDER BY time_stamp ASC")
+        print(sql)
         query = self.db.dbQuery(sql)
 
         #  for each time, insert the associated data in the table widget
@@ -115,6 +116,7 @@ class NetDlg(QDialog, ui_NetDlg.Ui_netDlg):
                         self.ship + " AND survey=" + self.survey + " AND event_id=" +
                         self.activeEvent + " AND measurement_type='" + self.measurements[i] +
                         "' AND time_stamp=to_timestamp('" + timestamp + "','MMDDYYYY HH24:MI:SS.FF3')")
+                print(sql)
                 dataQuery = self.db.dbQuery(sql)
                 val, = dataQuery.first()
                 if val:
@@ -230,6 +232,7 @@ class NetDlg(QDialog, ui_NetDlg.Ui_netDlg):
                             "," + self.activeEvent + ",0,to_timestamp('" + self.setTime +
                             "','MMDDYYYY HH24:MI:SS.FF3'),'" + self.measurements[i] + "','" +
                             self.buttons[i].text()+"')")
+                    print(sql)
                     self.db.dbExec(sql)
 
         self.setTime=None

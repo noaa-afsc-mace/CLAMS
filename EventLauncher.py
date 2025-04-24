@@ -46,8 +46,8 @@ from events import *
 import eventseldlg
 from ui import ui_EventLauncher
 
-class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
 
+class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
     def __init__(self, parent):
         #  call the superclass inits and create the UI
         super(EventLauncher, self).__init__(parent)
@@ -64,7 +64,7 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
 
         #  create a list of button references ordered from top to bottom
         self.eventButtons = [self.pbEvent1, self.pbEvent2, self.pbEvent3, self.pbEvent4,
-                self.pbEvent5, self.pbEvent6, self.pbEvent7, self.pbEvent8]
+                             self.pbEvent5, self.pbEvent6, self.pbEvent7, self.pbEvent8]
 
         #  and connect their signals and initially hide all of them
         for button in self.eventButtons:
@@ -73,16 +73,19 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
 
         #  First extract the events from the application_events table and update the buttons
         #  Also build a dict of events and their package, module, and entry class names
+        # 4/3/25 updated to get only ACTIVE
         nEvents = 0
         self.eventInfo = {}
+        # sql = ("SELECT event_name, event_package, event_module, event_class, active FROM " +
+        #        self.parent.schema + ".application_events ORDER BY event_name")
         sql = ("SELECT event_name, event_package, event_module, event_class, active FROM " +
-                self.parent.schema + ".application_events ORDER BY event_name")
+               self.parent.schema + ".application_events WHERE active=1 ORDER BY event_name")
         eventQuery = self.db.dbQuery(sql)
 
         #  loop through the events and set the button text and other bits
         for event_name, event_package, event_module, event_class, active in eventQuery:
             self.eventButtons[nEvents].setText(event_name)
-            if active.lower() in ['1','y']:
+            if active.lower() in ['1', 'y']:
                 self.eventButtons[nEvents].setEnabled(True)
                 self.eventButtons[nEvents].show()
             else:
@@ -90,10 +93,8 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
             self.eventInfo[event_name] = [event_package, event_module, event_class]
             nEvents += 1
 
-
     def eventButtonClicked(self):
-
-        event_name =  QObject.sender(self).text()
+        event_name = QObject.sender(self).text()
 
         #  get the event details
         eventDetails = self.eventInfo[event_name]
@@ -110,7 +111,7 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
         eventSelectDialog.exec()
 
         #  check if a event number was selected - exit if not
-        if eventSelectDialog.activeEvent == None:
+        if eventSelectDialog.activeEvent is None:
             return
 
         #  import the selected event form module
@@ -126,11 +127,8 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
         #  close this dialog
         self.accept()
 
-
     def cancelClicked(self):
         self.reject()
 
-
     def closeEvent(self):
         self.reject()
-
