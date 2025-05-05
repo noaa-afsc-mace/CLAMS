@@ -217,7 +217,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
         if self.scientistBox.currentIndex() ==-1:
             self.scientistBox.clear()
             sql = ("SELECT scientist FROM V_SPECIMEN_MEASUREMENTS WHERE " +
-                                " ship=" + self.ship +" AND survey=" + self.survey + " AND haul=" + self.activeHaul +
+                                " ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY scientist ORDER BY scientist")
             query = self.db.dbQuery(sql)
             for value in query:
@@ -227,7 +227,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
         if self.workstationBox.currentIndex() ==-1:
             self.workstationBox.clear()
             sql = ("SELECT workstation_ID FROM V_SPECIMEN_MEASUREMENTS WHERE " +
-                                " ship=" + self.ship +" AND survey=" + self.survey + " AND haul=" + self.activeHaul +
+                                " ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY workstation_ID ORDER BY workstation_ID")
             query = self.db.dbQuery(sql)
             for value in query:
@@ -237,7 +237,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
         if self.speciesBox.currentIndex() ==-1:
             self.speciesBox.clear()
             sql = ("SELECT species_code, common_name, subcategory, sample_id FROM V_SPECIMEN_MEASUREMENTS WHERE " +
-                                " ship=" + self.ship + " AND survey=" + self.survey + " AND haul=" + self.activeHaul +
+                                " ship=" + self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY species_code, common_name, subcategory, sample_id ORDER BY species_code")
             query = self.db.dbQuery(sql)
             for value in query:
@@ -383,7 +383,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
         '''
         self.sqlString='Scientist,Workstation_ID,Species_code, Sample_ID, fork_Length, Organism_weight, Sex '
         self.measureModel.setQuery("SELECT SPECIMEN_ID, "+ self.sqlString+" FROM V_SPECIMEN_MEASUREMENTS WHERE " +
-                            " ship=" + self.ship +" AND survey=" + self.survey + " AND haul=" + self.activeHaul +
+                            " ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                             " AND partition='" + self.activePartition + "' "+self.filterString+" ORDER BY SPECIMEN_ID")
 
         self.measureModel.beginResetModel()

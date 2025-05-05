@@ -54,3 +54,22 @@ ALTER TABLE devices MODIFY (device_interface NOT NULL);
 ALTER TABLE devices MODIFY (active NOT NULL);
 
 alter table MEASUREMENT_SETUP drop column DEVICE_INTERFACE;
+
+
+
+-- THESE ONLY NEED TO BE APPLIED TO ALICIA'S COPIES OF THE DEV DATABASE EXPORT
+
+ALTER TABLE SURVEY_REGIONS RENAME TO SURVEY_TIMESERIES;
+
+ALTER TABLE SURVEY_TIMESERIES
+RENAME COLUMN REGION TO timeseries;
+
+COMMENT ON COLUMN SURVEY_TIMESERIES.timeseries IS 'A tag given to the surveys that collectively make up a survey time series';
+
+COMMENT ON COLUMN SURVEY_TIMESERIES.DESCRIPTION IS 'A description of the time series.';
+
+ALTER TABLE SURVEYS
+RENAME COLUMN REGION TO timeseries;
+
+COMMENT ON COLUMN SURVEYS.timeseries IS 'The time series this survey is part of.';
+

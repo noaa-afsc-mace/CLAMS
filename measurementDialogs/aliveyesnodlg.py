@@ -14,9 +14,9 @@
 #  DOCUMENTATION; OR (2) TO PROVIDE TECHNICAL SUPPORT TO USERS.
 
 """
-.. module:: MatSelDlg
+.. module:: FinClipTakenYesNoDlg
 
-    :synopsis: Dialog to choose maturity
+    :synopsis: Dialog to present yes/no for taking an otolith
 
 | Developed by:  Rick Towler   <rick.towler@noaa.gov>
 |                Kresimir Williams   <kresimir.williams@noaa.gov>
@@ -40,76 +40,72 @@
 |               - signal/slot connections
 |               - added some function explanation
 |               - fixed any PEP8 issues
+|               - added a main to test if works (commented out)
+|
 """
 
 from PyQt6.QtWidgets import *
-from ui import ui_MatSelDlg
-import matguide
+from ui import ui_YesNoDlg
+from sys import argv
 
 
-class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
-
+class AliveYesNoDlg(QDialog, ui_YesNoDlg.Ui_YesNoDlg):
     def __init__(self,  parent=None):
-        super(MatSelDlg, self).__init__(parent)
+        super(AliveYesNoDlg, self).__init__(parent)
         self.setupUi(self)
-        self.db = parent.db
-        self.settings = parent.settings
-        self.speciesName = parent.activeSpcName
-        self.activeSpcCode = parent.activeSpcCode
-        self.activeSpcSubcat = parent.activeSpcSubcat
 
-        # variable declarations
+        # variable declaration
         self.result = ()
-        self.buttons = [self.mat1Btn, self.mat2Btn, self.mat3Btn, self.mat4Btn, self.mat5Btn,
-                self.mat6Btn, self.mat7Btn, self.mat8Btn]
-        # used for NWFSC
-        self.oto_present = True
 
-        # get maturity stage names
-        mat_stage_sql = "SELECT parameter_value FROM species_data " \
-                        "WHERE lower(species_parameter)='maturity_table' AND species_code=" + self.activeSpcCode
-        query = self.db.dbQuery(mat_stage_sql)
-        mat_stage_query, = query.first()
-        if not mat_stage_query:
-            return
+        #  connect signals
+        self.yesBtn.clicked.connect(self.getResponse)
+        self.noBtn.clicked.connect(self.getResponse)
 
-        mat_desc_sql = "SELECT md.button_text, md.description_text_female " \
-                       "FROM maturity_description md JOIN maturity_tables mt " \
-                       "ON (mt.maturity_table = md.maturity_table) WHERE " \
-                       "(mt.maturity_table = " + mat_stage_query + ")"
-        query = self.db.dbQuery(mat_desc_sql)
-        maturityBtnText = []
-
-        for button_text, description in query:
-            maturityBtnText.append(button_text)
-
-        # signal/slot connections
-        self.guideBtn.clicked.connect(self.getGuide)
-        for btn in self.buttons:
-            btn.clicked.connect(self.getMat)
-            try:
-                btn.setText(maturityBtnText[self.buttons.index(btn)])
-            except:
-                btn.setText(' - ')
-                btn.setEnabled(False)
-
+        #  set the caption
+        self.setCaption('Alive?')
 
     def setup(self, parent):
+        """
+        does nothing
+        :param parent: not used in this function
+        :return: none
+        """
         pass
 
+    def setCaption(self, text):
+        """
+        sets the message label to the passed text
+        :param text: text to set label to
+        :return: none
+        """
+        self.msgLabel.setText(text)
 
-    def getMat(self):
+    def getResponse(self):
+        """
+        sets the result tuple to access from the calling dialog with the variables
+        :return: self.accept the dialog and return
+        """
+        #  return the text
         self.result = (True, self.sender().text())
         self.accept()
 
-
-    def getGuide(self):
-        matGuide = matguide.MatGuide(self)
-        matGuide.exec()
-
-
     def closeEvent(self, event):
-
+        """
+        sets the result tuple to access from the calling dialog
+        :return: self.reject and return
+        """
         self.result = (False, '')
         self.reject()
 
+
+"""
+if __name__ == "__main__":
+    #  create an instance of QApplication
+    app = QApplication(argv)
+    #  create an instance of the dialog
+    form = HeadTakenYesNoDlg()
+    #  show it
+    form.show()
+    #  and start the application...
+    app.exec()
+"""

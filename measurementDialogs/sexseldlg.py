@@ -14,7 +14,7 @@
 #  DOCUMENTATION; OR (2) TO PROVIDE TECHNICAL SUPPORT TO USERS.
 
 """
-.. module:: OtolithYesNoDlg
+.. module:: SexSelDlg
 
     :synopsis: Dialog to present yes/no for taking an otolith
 

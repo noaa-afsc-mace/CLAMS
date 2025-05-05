@@ -803,14 +803,14 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         if self.admin:
             sql = ("SELECT count(specimen_id), SEX "+
                 " FROM V_SPECIMEN_MEASUREMENTS  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND haul="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+
+                " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+
                 "AND PROTOCOL_NAME='Length_Sex' GROUP BY SEX ")
             query = self.db.dbQuery(sql)
         # otherwise, if not admin, query the lengths from just the current workstation
         else:
             sql=("SELECT count(specimen_id), SEX "+
                 " FROM V_SPECIMEN_MEASUREMENTS  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND haul="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+"  AND "+
+                " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+"  AND "+
                 " WORKSTATION_ID = "+self.workStation+" AND PROTOCOL_NAME='Length_Sex'  GROUP BY SEX ")
             query = self.db.dbQuery(sql)
         counts = []

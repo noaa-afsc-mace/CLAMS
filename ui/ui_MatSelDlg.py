@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_matselDlg(object):
     def setupUi(self, matselDlg):
         matselDlg.setObjectName("matselDlg")
-        matselDlg.resize(356, 418)
+        matselDlg.resize(562, 418)
         self.verticalLayout = QtWidgets.QVBoxLayout(matselDlg)
         self.verticalLayout.setObjectName("verticalLayout")
         self.gridLayout = QtWidgets.QGridLayout()
