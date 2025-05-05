@@ -55,9 +55,11 @@ import timedlg
 from events.FEAT_Events import netdlg_feat
 from events.FEAT_Events import metadlg
 from events.FEAT_Events import abortdlg
+from events.FEAT_Events import donedlg
 from acquisition.SensorMonitor import SensorMonitor
 
 
+# noinspection PyArgumentList,PyCallByClass,PyTypeChecker
 class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
     def __init__(self, eventID, parent=None):
         """
@@ -107,7 +109,10 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         self.cur_time = None
         self.idxs = []
         self.net_btn = None
+        self.fishingFlag = False
+        self.event_entered = False
 
+        # set up the time to display for the timer
         self.niw_time = QTime(0, 0, 0)
         self.td_time = QTime(0, 0, 0)
         self.hb_time = QTime(0, 0, 0)
@@ -115,14 +120,14 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         self.event_time = QTime(0, 0, 0)
         self.tow_time = QTime(0, 0, 0)
 
-        # setup reoccurring dialogs
+        # setup recurring dialogs
         self.numpad = numpad.NumPad(self)
         self.message = messagedlg.MessageDlg(self)
         self.timeDlg = timedlg.TimeDlg()
         self.timeDlg.enableGetTimeButton(False)
         self.netdlg = netdlg_feat.NetDlgFEAT(self)
 
-        # create a status bar
+        # create a status bar to display the status of SCS
         self.statusBar = QStatusBar(self)
         self.statusLayout.addWidget(self.statusBar)
 
@@ -155,7 +160,8 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         self.pb_abort.clicked.connect(self.abort_operation)
         self.commentBtn.clicked.connect(self.add_comment)
         self.doneBtn.clicked.connect(self.finish_event)
-        self.netDimBtn.clicked.connect(self.get_net_dims)
+        # self.netDimBtn.clicked.connect(self.get_net_dims)
+        self.dataTable.itemSelectionChanged.connect(self.edit_dims)
         for b in self.buttons:
             b.clicked.connect(self.set_event)
 
@@ -167,20 +173,15 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
     def init_trawl_event_dialog(self):
         """
-        shows the FEAT trawl form
+        shows the FEAT trawl form - the active event is set in when the event is selected (eventseldlg) and
+        is set depending on if the CLAMSTEST variable is True or False in the Application_Configuration table
         :return:
         """
-        # check if in testing mode and set the current event to be a larger number to keep it out of the final data
-        # TODO: this may not work when not testing if there are testing hauls in the db
-        test_sql = ("SELECT parameter_value FROM " + self.schema + ".application_configuration " +
-                    "WHERE parameter='CLAMSTEST'")
-        test_query = self.db.dbQuery(test_sql)
-        self.clam_test, = test_query.first()
-        if self.clam_test.lower() in ['true', 'yes', 'y', '1'] and int(self.activeEvent) < 900:
-            self.activeEvent = int(self.activeEvent) + 900
+        # sets the haul number to the activeEvent
         self.l_haul.setText(str(self.activeEvent).zfill(3))
 
-        self.netdlg.reloadData()
+        # reloads the netdlg now
+        self.netdlg.reload_data()
 
         #  query out the "slow" and "fast" SCS write rates. We write SCS data to the
         #  event_stream_data table at different rates depending on where we are in
@@ -207,17 +208,14 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                 pass
 
         # if this is a restart or continuation of an already started event, reload previously collected data
-        sql = "SELECT event_id FROM " + self.schema + ".events WHERE ship=" + self.ship + \
-              " AND survey=" + self.survey + " AND event_id=" + str(self.activeEvent)
+        sql = ("SELECT event_id FROM " + self.schema + ".events WHERE ship=" + self.ship + " AND survey="
+               + self.survey + " AND event_id=" + str(self.activeEvent))
         query = self.db.dbQuery(sql)
         event_id, = query.first()
         if event_id:
-            #  this is a restart so reload any existing data
+            # this is a restart so reload any existing data
             self.reloaded = True
             self.reload_data()
-        else:
-            #  this is a new event
-            pass
 
         #  Set up sensors - first create an instance of SensorMonitor
         #  which will handle all the details of receiving and parsing
@@ -289,27 +287,47 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
     def deal_with_buttons(self):
         """
-
+        deals with which buttons are enabled/disabled
         :return:
         """
         self.disable_enable_buttons('disable', self.doneBtn)
         if self.meta_entered:
-            # disable all event buttons
+            # disable all event buttons (except com)
             self.disable_enable_buttons('disable', 'events')
+            # if there are no event buttons that are pressed yet (and therefore in self.button_order),
+            # enable the NIW and COM buttons
             if not self.button_order:
                 # enable the niw and com buttons
                 self.disable_enable_buttons('enable', self.pb_niw)
                 self.disable_enable_buttons('enable', self.pb_com)
+            # if both NIW and NOD have been pressed, disable all buttons except for metadata
+            elif 'NOD' in self.button_order and 'NIW' in self.button_order:
+                self.disable_enable_buttons('disable', 'events')
+                self.disable_enable_buttons('disable', self.pb_abort)
+                self.disable_enable_buttons('disable', self.pb_com)
+                self.disable_enable_buttons('enable', self.doneBtn)
+            # if the NOD button has been pressed, enable the done button
+            elif 'NOD' in self.button_order:
+                self.disable_enable_buttons('enable', self.doneBtn)
+            # if 'NIW' has been pressed, enable the abort button
+            elif 'NIW' in self.button_order:
+                self.pb_abort.setEnabled(True)
+            # if buttons have been pressed, identify the last pressed by index and disable,
+            # while enabling the next button
             else:
                 i_max = 0
                 for i in self.idxs:
                     if i != 6:
-                        self.disable_enable_buttons('disable', self.buttons[i])
+                        if 'com' not in self.buttons[i].text().lower():
+                            self.disable_enable_buttons('disable', self.buttons[i])
                         if i_max < i:
                             i_max = i
                 self.disable_enable_buttons('enable', self.buttons[i_max + 1])
         else:
+            # disable all event buttons, including com
             self.disable_enable_buttons('disable', 'events')
+            self.disable_enable_buttons('disable', self.pb_com)
+            # disable abort, net dimensions, and done
             self.disable_enable_buttons('disable')
 
     def disable_enable_buttons(self, action, btn=None):
@@ -321,10 +339,13 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         :return: none
         """
         if btn == 'events':
-            # got through all event buttons
+            # got through all event buttons, except for COM
             for btn in self.buttons:
-                if action == 'disable':
-                    btn.setEnabled(False)
+                if btn.text().lower() != 'com':
+                    if action == 'disable':
+                        btn.setEnabled(False)
+                    else:
+                        btn.setEnabled(True)
                 else:
                     btn.setEnabled(True)
         elif btn:
@@ -333,28 +354,30 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
             else:
                 btn.setEnabled(True)
         else:
-            # gear abort (only disable), done, net dimensions, comment
+            # abort (only disable), done, net dimensions
             if action == 'disable':
                 self.pb_abort.setEnabled(False)
                 self.doneBtn.setEnabled(False)
-                self.netDimBtn.setEnabled(False)
+                # self.netDimBtn.setEnabled(False)
             else:
                 self.doneBtn.setEnabled(True)
-                self.netDimBtn.setEnabled(True)
+                # self.netDimBtn.setEnabled(True)
 
-    def display_time(self, t_type):
+    def display_time(self, t_type, show_only=False):
         """
         displays the timers
         :return: none
         """
         if t_type == 'overall':
-            self.event_time = self.event_time.addSecs(1)
+            if not show_only:
+                self.event_time = self.event_time.addSecs(1)
             if self.event_time.hour() > 0:
                 self.elapseLabel.setText(self.event_time.toString('h:mm:ss'))
             else:
                 self.elapseLabel.setText(self.event_time.toString('mm:ss'))
         else:
-            self.tow_time = self.tow_time.addSecs(1)
+            if not show_only:
+                self.tow_time = self.tow_time.addSecs(1)
             if self.tow_time.hour() > 0:
                 self.l_timeTD.setText(self.tow_time.toString('h:mm:ss'))
             else:
@@ -364,11 +387,12 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         """
         populates the form, metadata, and net dimensions with whatever data exists in the database for this event
         """
+        # deal with all buttons
+        self.deal_with_buttons()
         # check if the metadata to entered
         exists = self.check_for_required_meta()
         if exists == 1:
             self.meta_entered = True
-            #todo: here --- why are the event buttons still showing up:?
         else:
             self.meta_entered = False
             return
@@ -381,26 +405,28 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                 " AND survey=" + self.survey + " AND event_id=" + self.activeEvent)
         query = self.db.dbQuery(sql)
         self.comment = query.first()
-        #  if there isn't a comment - set it to an empty string.
+        # if there isn't a comment - set it to an empty string.
         if self.comment is None:
             self.comment = ''
 
-        # set up elapsed seconds
+        # set up elapsed seconds to populate
         overall_elapsed = 0
         td_elapsed = 0
 
-        # get events by timestamp
+        # get event types entered by timestamp
         ev_sql = ("SELECT event_parameter, to_char(to_timestamp(parameter_value,'MMDDYYYY HH24:MI:SS.FF3')) AS times "
                   "FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
                   " AND event_id=" + self.activeEvent + " AND partition='MainTrawl' AND event_parameter IN "
-                                                        "('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM1', 'COM2', "
-                                                        "'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9') "
+                                                        "('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM01', 'COM02', "
+                                                        "'COM03', 'COM04', 'COM05', 'COM06', 'COM07', 'COM08', 'COM09',"
+                                                        " 'COM10', 'COM11', 'COM12', 'COM14', 'COM14', 'COM15') "
                                                         "ORDER BY times ASC")
-
         ev_query = self.db.dbQuery(ev_sql)
+
+        # go through each event type entered into database and add to the table
         row = 0
         for ev, ts in ev_query:
-            # add to button order
+            # add to button order list
             self.button_order.append(ev)
             # set the button text
             if 'com' in ev.lower():
@@ -416,14 +442,9 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
             self.idxs.append(ind)
 
             #  first check for event_data parameters
-            if 'COM' in btn_txt:
-                sql = ("SELECT event_parameter, parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
-                        self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeEvent +
-                        " AND partition='MainTrawl' AND event_parameter LIKE 'COM%'")
-            else:
-                sql = ("SELECT event_parameter, parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
-                        self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeEvent +
-                        " AND partition='MainTrawl' AND event_parameter='" + btn_txt + "'")
+            sql = ("SELECT event_parameter, parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
+                   self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeEvent +
+                   " AND partition='MainTrawl' AND event_parameter='" + ev + "'")
             query = self.db.dbQuery(sql)
             param, val = query.first()
 
@@ -438,35 +459,42 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                 self.dataTable.setItem(row, 2, QTableWidgetItem(buttonValues[0]))
                 self.dataTable.setItem(row, 3, QTableWidgetItem(buttonValues[1]))
                 self.dataTable.setItem(row, 4, QTableWidgetItem(buttonValues[2]))
-                self.buttons[ind].setPalette(self.green)
+                if 'com' not in btn_txt.lower():
+                    self.buttons[ind].setPalette(self.green)
+                else:
+                    self.buttons[ind].setPalette(self.yellow)
 
-                # compute the elapsed seconds since NIW was pressed
                 if param == 'NIW':
+                    # get elapsed seconds since NIW was pressed
                     self.niw_time = self.btnTimes[row]
                     overall_elapsed = self.btnTimes[row].secsTo(QDateTime().currentDateTime())
-                if param == 'NOD':
+                elif param == 'NOD':
+                    # get the time NOD was pressed
                     self.nod_time = self.btnTimes[row]
-                # compute the elapsed seconds since TD was pressed
-                if param == 'TD':
+                elif param == 'TD':
+                    # get elapsed seconds since TD was pressed
                     self.td_time = self.btnTimes[row]
                     td_elapsed = self.btnTimes[row].secsTo(QDateTime().currentDateTime())
-                if param == 'HB':
+                elif param == 'HB':
+                    # get the time HB was pressed
                     self.hb_time = self.btnTimes[row]
             row += 1
             self.cur_dt_row = row
 
         #  set timers to display the elapsed time
         if overall_elapsed > 0 and 'NOD' in self.button_order:
-            self.event_time = self.niw_time.secsTo(self.nod_time)
-            self.event_timer.timeout.connect(lambda: self.display_time('overall'))
+            tot_time = self.niw_time.secsTo(self.nod_time)
+            self.event_time = self.event_time.addSecs(tot_time)
+            self.display_time('overall', True)
         elif 'NIW' in self.button_order:
             self.event_time = self.event_time.addSecs(overall_elapsed)
             self.event_timer.timeout.connect(lambda: self.display_time('overall'))
             self.event_timer.start(1000)
         # if HB is pressed, get elapsed time
         if td_elapsed > 0 and 'HB' in self.button_order:
-            self.tow_time = self.td_time.secsTo(self.hb_time)
-            self.td_timer.timeout.connect(lambda: self.display_time('td'))
+            at_depth_time = self.td_time.secsTo(self.hb_time)
+            self.tow_time = self.tow_time.addSecs(at_depth_time)
+            self.display_time('td', True)
         elif 'TD' in self.button_order:
             self.tow_time = self.tow_time.addSecs(td_elapsed)
             self.td_timer.timeout.connect(lambda: self.display_time('td'))
@@ -474,8 +502,13 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
         self.dataTable.resizeColumnsToContents()
 
-        #  The event has been started to we disable the gear box and enable comment button
-        self.recording = True
+        if 'NOD' in self.button_order:
+            print('here')
+            self.recording = False
+            self.doneBtn.setEnabled(True)
+        else:
+            self.recording = True
+        # enable the comment box
         self.commentBtn.setEnabled(True)
 
         #  check if this event has been completed. Completed is defined as having NIW and NOD
@@ -495,12 +528,9 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                     self.SCSLogInterval = self.streamEQHBLogInterval
                     self.fishingFlag = True
                 #  set other state variables for a "live" event
-                self.reloaded = False
                 self.recordStream = True
-                self.netdlg.reloaded = False
             else:
                 #  this is not a live event - treat this as an edit after the fact
-                self.reloaded = True
                 self.recordStream = False
         # check if NIW and NOD have both been pressed; if so, it is completed and can only edit
         if 'NIW' in self.button_order and 'NOD' in self.button_order:
@@ -508,6 +538,7 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                                     "You can only edit it. New time values must be within the original "
                                     "time span of the event. " +
                                     "No new stream data will be recorded.</font>", QMessageBox.StandardButton.Ok)
+        print(self.doneBtn.isEnabled())
 
     def check_for_required_meta(self):
         """
@@ -623,7 +654,7 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
         # get the text of the button
         self.cur_btn_txt = self.sender().text()
-        # todo: i think there is something wrong here...
+
         if 'COM' not in self.cur_btn_txt:
             self.button_order.append(self.cur_btn_txt)
         else:
@@ -633,8 +664,8 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                 if 'com' in b.lower():
                     com_ct += 1
                     # get the number
-                    cur_num = int(b[-1])
-                    if cur_num > cur_com_num:
+                    cur_num = int(b[-2])
+                    if cur_num >= cur_com_num:
                         cur_com_num = cur_num
             self.cur_btn_txt = 'COM' + str(cur_com_num + 1)
             if com_ct == 8:
@@ -643,7 +674,6 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         # save in DB
         # get the current timestamp
         self.cur_time = QDateTime.currentDateTime().toString('MMddyyyy hh:mm:ss.zzz')
-
         event_sql = ("INSERT INTO " + self.schema +
                      ".event_data (ship, survey, event_id, partition, event_parameter, parameter_value) "
                      "VALUES (" + self.ship + ", " + self.survey + ", " + self.activeEvent + ", 'MainTrawl', '"
@@ -676,15 +706,16 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
             self.net_btn = 'TD'
             self.get_net_dims()
         elif 'HB' in self.cur_btn_txt:
-            # if HB is pressed, send up net dimensions
-
             # stop the timer
             self.td_timer.stop()
+            # if HB is pressed, send up net dimensions
+            self.net_btn = 'HB'
+            self.get_net_dims()
         elif 'NIW' in self.cur_btn_txt:
             # if NIW is pressed, start recording and enable the abort button
             self.recording = True
             self.disable_enable_buttons('enable', self.pb_abort)
-            self.disable_enable_buttons('enable', self.netDimBtn)
+            # self.disable_enable_buttons('enable', self.netDimBtn)
             # set the timer
             self.event_timer.timeout.connect(lambda: self.display_time('overall'))
             self.event_timer.start(1000)
@@ -695,7 +726,8 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
             self.event_timer.stop()
         elif 'COM' in self.cur_btn_txt:
             # if COM is pressed, send up net dimensions
-            QTimer.singleShot(500, self.get_net_dims)
+            self.net_btn = 'COM'
+            self.get_net_dims()
 
         # set next button enabled if the current button isn't a com
         if 'COM' not in self.cur_btn_txt:
@@ -705,9 +737,8 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         # move current row ahead one
         self.cur_dt_row += 1
 
-    def write_stream(self, device_name, data, err):
+    def write_stream(self, device_name, data):
         """
-        todo: uncomment sql write when ready
         write_stream is called when we receive sensor data (from SCS)
         :return:
         """
@@ -759,7 +790,7 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
                         "VALUES (" + self.ship + "," + self.survey + "," + str(self.activeEvent) + "," +
                         self.deviceData[device_name]['id'] + ",'" + time + "','" + measurement +
                         "','" + data + "')")
-                #self.db.dbExec(sql)
+                self.db.dbExec(sql)
                 wroteToDb = True
 
             if measurement in self.displayMeasurements:
@@ -788,26 +819,53 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
     def finish_event(self):
         """
-
+        popup for entering the performance of the operation and allowing to check/enter comments
         :return:
         """
-        # popup to force gear performance and allow for additional comments
+        if 'NOD' in self.button_order:
+            # stop recording
+            self.recording = False
+            # set up the finish dialog
+            done = donedlg.DoneDlg(self)
+            # display the dialog
+            result = done.exec()
+
+            # if not cancelled, operation is complete
+            if result == QDialog.DialogCode.Accepted:
+                self.accept()
 
     def get_net_dims(self):
         """
         called when the user hits TD, HB, COM or the NetDims button. This presents
         a simple dialog for entering the net opening width and height and the amount of wire out.
         """
-        print(self.sender().text())
-        print(self.cur_time)
-
         self.net_btn = self.sender().text()
 
         # reload the net dimension values
-        self.netdlg.reloadData(self.net_btn, self.cur_time)
+        self.netdlg.reload_data(self.net_btn, self.cur_time)
+
+        # set the text for the button
+        self.netdlg.addRecordBtn.setText("Add\nRecord")
 
         # display the dialog
         self.netdlg.exec()
+
+    def edit_dims(self):
+        """
+
+        :return:
+        """
+
+        # get the timestamp
+        self.cur_time = self.dataTable.item(self.dataTable.currentRow(), 1).text()
+        self.net_btn = self.dataTable.item(self.dataTable.currentRow(), 0).text()
+        self.netdlg.reload_data(self.net_btn, self.cur_time)
+        if self.net_btn in ['TD', 'HB'] or 'COM' in self.net_btn:
+            # display the dialog
+            if self.netdlg.exec():
+                self.dataTable.blockSignals(True)
+                self.dataTable.clearSelection()
+                self.dataTable.blockSignals(False)
 
     @pyqtSlot(str, object)
     def device_error(self, deviceID, obj):
@@ -819,9 +877,10 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         """
         # there was an issue with a device so display a warning dialog
         QMessageBox.warning(self, "Sensor/Device Error", "<font size = 14>" +
-                            obj.errText + " This device will be not be enabled.")
+                            obj.errText + " This device will be not be enabled (Device id: " + deviceID + ".")
 
-    def convertDegToDecimal(self, deg, pos):
+    @staticmethod
+    def convertDegToDecimal(deg, pos):
         """
 
         :param deg:
@@ -858,23 +917,27 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
         meta.reload_data()
         # display the dialog
         result = meta.exec()
-        if result == QDialog.DialogCode.Accepted:
-            self.meta_entered = True
-            self.enter_meta_info()
-            # disable all event buttons
-            self.disable_enable_buttons('disable', 'events')
-            if not self.button_order:
-                # enable the niw and com buttons
-                self.disable_enable_buttons('enable', self.pb_niw)
-                self.disable_enable_buttons('enable', self.pb_com)
-            else:
-                i_max = 0
-                for i in self.idxs:
-                    if i != 6:
-                        self.disable_enable_buttons('disable', self.buttons[i])
-                        if i_max < i:
-                            i_max = i
-                self.disable_enable_buttons('enable', self.buttons[i_max + 1])
+        if result:
+            # check if meta actually entered - this is a double-check since it should be entered if we got this far
+            temp = self.check_for_required_meta()
+            if temp == 1:
+                self.meta_entered = True
+                self.enter_meta_info()
+                self.event_entered = True
+                # disable all event buttons
+                self.disable_enable_buttons('disable', 'events')
+                if not self.button_order:
+                    # enable the niw and com buttons
+                    self.disable_enable_buttons('enable', self.pb_niw)
+                    self.disable_enable_buttons('enable', self.pb_com)
+                else:
+                    i_max = 0
+                    for i in self.idxs:
+                        if i != 6:
+                            self.disable_enable_buttons('disable', self.buttons[i])
+                            if i_max < i:
+                                i_max = i
+                    self.disable_enable_buttons('enable', self.buttons[i_max + 1])
 
     def enter_meta_info(self):
         """
@@ -898,7 +961,7 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
     def abort_operation(self):
         """
-
+        'aborts' the tow and requires performance (reason) and comments
         :return:
         """
         # open dialog only if NIW has already been pressed
@@ -912,5 +975,4 @@ class Event(QDialog, ui_FEATTrawlEvent_work.Ui_FEATTrawlEvent):
 
             # if not cancelled, operation is complete
             if result == QDialog.DialogCode.Accepted:
-                print('aborting operation')
-
+                self.accept()

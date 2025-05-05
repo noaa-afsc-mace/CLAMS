@@ -58,6 +58,9 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
         self.ship = parent.ship
         self.survey = parent.survey
         self.parent = parent
+        # added by AB
+        self.settings = parent.settings
+        self.schema = parent.schema
 
         #  connect the cancel button signal
         self.pbCancel.clicked.connect(self.cancelClicked)
@@ -98,7 +101,11 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
 
         #  get the event details
         eventDetails = self.eventInfo[event_name]
-
+        print(self.settings['OrganizationName'])
+        if 'nwfsc' in self.settings['OrganizationName'].lower():
+            moduleName = 'events.' + eventDetails[0] + '.' + eventDetails[1]
+            module = importlib.import_module(moduleName)
+            module.FEATTrawlEvent(self.parent)
         if 'trawl' in event_name.lower():
             #  create an instance of the event selection dialog showing
             #  only catch events

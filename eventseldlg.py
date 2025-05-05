@@ -61,6 +61,9 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
         self.ship=parent.ship
         self.survey=parent.survey
         self.eventTable.setRowCount(0)
+        # added by AB
+        self.settings = parent.settings
+        self.schema = parent.schema
 
         #  set up the table
         self.eventTable.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
@@ -97,24 +100,55 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
             self.eventTable.setItem(rowCount, 0, QTableWidgetItem(event_id))
 
             if catchOnly:
-                #  check if the event is "closed" defined by having a HB time
-                sql = ("SELECT parameter_value FROM event_data WHERE event_parameter='Haulback'" +
-                        " AND event_id=" + event_id + " AND ship=" + parent.ship +
-                        " AND survey=" + parent.survey)
-                query = self.db.dbQuery(sql)
-                hbTime, = query.first()
+                # if this is for NWC or SWC, closed is defined by having a NOD time, not HB time
+                if 'nwfsc' in self.settings['OrganizationName'].lower() or \
+                        'swfsc' in self.settings['OrganizationName'].lower():
+                    # get the HB time
+                    hb_sql = ("SELECT parameter_value FROM event_data WHERE event_parameter='HB'" +
+                              " AND event_id=" + event_id + " AND ship=" + parent.ship +
+                              " AND survey=" + parent.survey)
+                    hb_query = self.db.dbQuery(hb_sql)
+                    hbTime, = hb_query.first()
+                    if hbTime:
+                        # enter the hb time into the table
+                        self.eventTable.setItem(rowCount, 2, QTableWidgetItem(hbTime))
 
-                if hbTime:
-                    #  event is closed - insert the gear in black text
-                    self.eventTable.setItem(rowCount, 1, QTableWidgetItem(gear))
-                    self.eventTable.setItem(rowCount, 2, QTableWidgetItem(hbTime))
+                    # get the NOD time
+                    nod_sql = ("SELECT parameter_value FROM event_data WHERE event_parameter='NOD'" +
+                               " AND event_id=" + event_id + " AND ship=" + parent.ship +
+                               " AND survey=" + parent.survey)
+                    nod_query = self.db.dbQuery(nod_sql)
+                    nod_time, = nod_query.first()
+
+                    if nod_time:
+                        # the event is 'closed' so insert gear in black
+                        self.eventTable.setItem(rowCount, 1, QTableWidgetItem(gear))
+                    else:
+                        # event is not closed so pink up the gear
+                        item = QTableWidgetItem(gear)
+                        brush = QBrush(QColor(250, 200, 200))
+                        brush.setStyle(Qt.BrushStyle.SolidPattern)
+                        item.setBackground(brush)
+                        self.eventTable.setItem(rowCount, 1, item)
                 else:
-                    #  event is not closed - insert the gear text with a pink background
-                    item = QTableWidgetItem(gear)
-                    brush = QBrush(QColor(250, 200, 200))
-                    brush.setStyle(Qt.BrushStyle.SolidPattern)
-                    item.setBackground(brush)
-                    self.eventTable.setItem(rowCount, 1, item)
+                    #  check if the event is "closed" defined by having a HB time
+                    sql = ("SELECT parameter_value FROM event_data WHERE event_parameter='Haulback'" +
+                           " AND event_id=" + event_id + " AND ship=" + parent.ship +
+                           " AND survey=" + parent.survey)
+                    query = self.db.dbQuery(sql)
+                    hbTime, = query.first()
+
+                    if hbTime:
+                        #  event is closed - insert the gear in black text
+                        self.eventTable.setItem(rowCount, 1, QTableWidgetItem(gear))
+                        self.eventTable.setItem(rowCount, 2, QTableWidgetItem(hbTime))
+                    else:
+                        #  event is not closed - insert the gear text with a pink background
+                        item = QTableWidgetItem(gear)
+                        brush = QBrush(QColor(250, 200, 200))
+                        brush.setStyle(Qt.BrushStyle.SolidPattern)
+                        item.setBackground(brush)
+                        self.eventTable.setItem(rowCount, 1, item)
 
             else:
                 #  For non catch events, "closed" is harder to define. We'll say if EQ, Timestamp,
@@ -158,15 +192,29 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
 
         '''
         #  get the last event ID
-        sql = ("SELECT MAX(event_id) FROM events WHERE survey ="+
-                self.survey + "and ship= " + self.ship)
+        sql = ("SELECT MAX(event_id) FROM " + self.schema + ".events WHERE survey ="+
+                self.survey + " and ship= " + self.ship)
         query = self.db.dbQuery(sql)
         lastEvent, = query.first()
         if lastEvent is None:
             lastEvent = 0
         else:
             lastEvent = int(lastEvent)
-
+        # AB - check if it is set for testing for NWC/SWC
+        if 'nwfsc' in self.settings['OrganizationName'].lower() or 'swfsc' in self.settings['OrganizationName'].lower():
+            if self.settings['CLAMSTEST'].lower() in ['true', 'yes', 'y', '1']:
+                # we are using 900+ for these numbers
+                if lastEvent == 0:
+                    lastEvent = 900
+            else:
+                ev_sql = ("SELECT MAX(event_id) FROM " + self.schema + ".events WHERE survey = " + self.survey
+                          + " AND ship = " + self.ship + " AND event_id <= 900")
+                ev_query = self.db.dbQuery(ev_sql)
+                lastEvent, = ev_query.first()
+                if lastEvent is None:
+                    lastEvent = 0
+                else:
+                    lastEvent = int(lastEvent)
         #  set the active event to the max + 1
         self.activeEvent = str(lastEvent + 1)
 

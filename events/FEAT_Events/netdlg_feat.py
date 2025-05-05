@@ -81,7 +81,7 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
         self.netTable.itemSelectionChanged.connect(self.edit_data)
         
         if self.reloaded:
-            self.reloadData()
+            self.reload_data()
             sql = ("SELECT to_char(min(time_stamp), 'MMDDYYYY HH24:MI:SS.FF3') " +
                     "FROM " + self.schema + ".event_stream_data WHERE ship=" + self.ship +
                     " AND survey=" + self.survey + " AND event_id=" + self.activeEvent)
@@ -95,7 +95,7 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
             timeStamp, = query.first()
             self.maxTime = QDateTime().fromString(timeStamp, 'MMddyyyy hh:mm:ss.zzz')
 
-    def reloadData(self, btn=None, cur_time=None):
+    def reload_data(self, btn=None, cur_time=None):
         """
         populates the table with any existing data. This is used when
         an event is reloaded and the dialog state has to be updated from the db.
@@ -104,6 +104,13 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
         if btn:
             btn = btn.replace('\n', ' ')
             self.net_btn = btn
+
+            # clear the button texts
+            self.pb_nh.setText('')
+            self.pb_nw.setText('')
+            self.pb_hd.setText('')
+            self.pb_wo.setText('')
+            self.pb_com.setText('')
 
             # if the button is the net dimensions button, do not allow to add a new record since we associate any
             # net dimension entries with an event (TD, HB, COM, etc)
@@ -158,14 +165,23 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
                     self.netTable.setItem(row, i+1, QTableWidgetItem(val))
                 else:
                     self.netTable.setItem(row, i+1, QTableWidgetItem(''))
-            row += 1
 
+            if timestamp == self.cur_time:
+                # find the row that matches the button
+                for row in range(self.netTable.rowCount()):
+                    item = self.netTable.item(row, 0).text()
+                    if item == self.net_btn:
+                        self.netTable.selectRow(row)
+            else:
+                self.edit_flag = False
+                self.addRecordBtn.setText('Add\nRecord')
+            row += 1
         self.netTable.resizeColumnsToContents()
         self.netTable.scrollToBottom()
 
     def edit_data(self):
         """
-
+        sets the text of the buttons depending on the row selected and sets the edit flag
         :return:
         """
 
@@ -206,12 +222,11 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
 
     def add_record(self):
         """
-        adds a total record to the database
+        adds a total record to the database or updates if it is flagged for editing
         :return:
         """
         # update record
         if self.edit_flag:
-            # todo: fix this so it uses the time and not the first column for entry
             for i in range(len(self.measurements)):
                 cur_btn = list(self.buttons.keys())[i]
                 if cur_btn.text() != '':
@@ -228,10 +243,8 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
                                   self.ship + " AND survey=" + self.survey + " AND event_id=" +
                                   self.activeEvent + " AND measurement_type='" + self.measurements[i] +
                                   "' AND time_stamp=to_timestamp('" + self.cur_time + "','MMDDYYYY HH24:MI:SS.FF3')")
-                    print(stream_sql)
                     stream_query = self.db.dbQuery(stream_sql)
                     ev, = stream_query.first()
-                    print(ev)
                     if not ev:
                         #  this is a new measurement, insert it
                         sql = ("INSERT INTO " + self.schema + ".event_stream_data (ship,survey, " +
@@ -247,7 +260,6 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
                                 self.survey + " AND event_id=" + self.activeEvent +
                                 " AND measurement_type='" + self.measurements[i] +
                                 "' AND time_stamp=to_timestamp('" + self.cur_time + "','MMDDYYYY HH24:MI:SS.FF3')")
-                        print(sql)
                         self.db.dbExec(sql)
                 else:
                     sql = ("DELETE FROM " + self.schema + ".event_stream_data WHERE ship=" +
@@ -273,10 +285,15 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
                     print(sql)
                     self.db.dbExec(sql)
                 i += 1
-        # self.reloadData()
-        self.accept()
+        self.reload_data()
 
     def doneClicked(self):
+        """
+        resets the button text, clears the selection, and closes the dialog
+        :return:
+        """
+        self.addRecordBtn.setText('Add\nRecord')
+        self.netTable.clearSelection()
         self.close()
 
     def closeEvent(self, event=None):

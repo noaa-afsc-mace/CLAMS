@@ -14,9 +14,9 @@
 #  DOCUMENTATION; OR (2) TO PROVIDE TECHNICAL SUPPORT TO USERS.
 
 """
-.. module:: abortdlg
+.. module:: donedlg
 
-    :synopsis: abortdlg is a dialog that collects the information for an event that is being aborted;
+    :synopsis: donedlg is a dialog that collects the gear performance and overall comments from a tow;
                 used by the NWFSC;
                 created by Alicia Billings <alicia.billings@noaa.gov>
 
@@ -37,15 +37,15 @@
 """
 
 from PyQt6.QtWidgets import *
-from ui import ui_AbortDlg
+from ui import ui_DoneDlg
 import keypad
 import messagedlg
 
 
-class AbortDlg(QDialog, ui_AbortDlg.Ui_abortDlg):
+class DoneDlg(QDialog, ui_DoneDlg.Ui_doneDlg):
 
     def __init__(self, parent=None):
-        super(AbortDlg, self).__init__(parent)
+        super(DoneDlg, self).__init__(parent)
         self.setupUi(self)
         self.settings = parent.settings
         self.db = parent.db
@@ -60,6 +60,7 @@ class AbortDlg(QDialog, ui_AbortDlg.Ui_abortDlg):
         self.gear = parent.gear
         self.scientist = parent.scientist
         self.final = False
+        self.cur_coms = ""
 
         self.message = messagedlg.MessageDlg(self)
 
@@ -67,13 +68,23 @@ class AbortDlg(QDialog, ui_AbortDlg.Ui_abortDlg):
         # fill the performance dialog
         self.cb_perf.clear()
         perf_sql = ("SELECT event_performance.performance_code, event_performance.description "
-                    "FROM " + self.schema + ".event_performance WHERE performance_code < 0 "
-                                            "ORDER BY event_performance.performance_code DESC")
+                    "FROM " + self.schema + ".event_performance ORDER BY event_performance.performance_code DESC")
         perf_query = self.db.dbQuery(perf_sql)
+        i = 0
         for perfCode, desc in perf_query:
             perf_txt = str(perfCode) + " - " + desc
             self.cb_perf.addItem(perf_txt)
+            if str(perfCode) == '0':
+                self.cb_perf.setCurrentIndex(i)
             self.cb_perf.setCurrentIndex(-1)
+            i += 1
+
+        # get the overall comments already entered to display
+        com_sql = ("SELECT comments FROM " + self.schema + ".events WHERE ship=" +
+                   self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeEvent)
+        com_query = self.db.dbQuery(com_sql)
+        self.cur_coms, = com_query.first()
+        self.te_comment.setText(self.cur_coms)
 
         # set signals and slots
         self.te_comment.selectionChanged.connect(self.display_keypad)
@@ -86,7 +97,7 @@ class AbortDlg(QDialog, ui_AbortDlg.Ui_abortDlg):
         and updates the text edit with the entered content
         :return:
         """
-        keyDialog = keypad.KeyPad('', self)
+        keyDialog = keypad.KeyPad(self.cur_coms, self)
         keyDialog.exec()
         if keyDialog.okFlag:
             text = keyDialog.dispEdit.toPlainText()
@@ -94,42 +105,20 @@ class AbortDlg(QDialog, ui_AbortDlg.Ui_abortDlg):
 
     def save(self):
         """
-        # force reason for abort with comment
-        # remind that the operation number will be burned
-        # set the performance to the reason
 
         :return: none
         """
         # check if the performance has been recorded and that a comment has been entered
         if self.cb_perf.currentText() == '':
-            self.final = False
-        elif self.te_comment.toPlainText() == '':
-            self.final = False
-        else:
-            self.final = True
-
-        if not self.final:
             self.message.setMessage(self.errorIcons[0], self.errorSounds[0],
-                                    "You must enter all fields to abort this operation", "error")
+                                    "You must enter the gear performance for this operation", "error")
             self.message.show()
         else:
             # get the performance code from the cb text
             code, desc = self.cb_perf.currentText().split(" - ")
-            # get current comments
-            com_sql = ("SELECT comments FROM " + self.schema + ".events WHERE ship=" + self.ship +
-                       " AND survey=" + self.survey + " AND event_id=" + str(self.activeEvent))
-            com_query = self.db.dbQuery(com_sql)
-            comments, = com_query.first()
-            if comments not in ['', None]:
-                # add to comments
-                fin_coms = comments + "; ABORT COMS: " + self.te_comment.toPlainText()
-            else:
-                fin_coms = "ABORT COMS: " + self.te_comment.toPlainText()
-            # update
             update_sql = ("UPDATE " + self.schema + ".events SET performance_code = " + str(code) +
-                          " AND comments = '" + fin_coms + "' WHERE ship=" + self.ship +
-                          " AND survey=" + self.survey + " AND event_id=" + str(self.activeEvent))
-
+                          ", comments = '" + self.cur_coms + "' WHERE ship=" + self.ship + " AND survey="
+                          + self.survey + " AND event_id=" + str(self.activeEvent))
             self.db.dbQuery(update_sql)
 
             self.accept()
