@@ -101,35 +101,35 @@ class EventLauncher(QDialog, ui_EventLauncher.Ui_EventLauncher):
 
         #  get the event details
         eventDetails = self.eventInfo[event_name]
-        print(self.settings['OrganizationName'])
         if 'nwfsc' in self.settings['OrganizationName'].lower():
             moduleName = 'events.' + eventDetails[0] + '.' + eventDetails[1]
             module = importlib.import_module(moduleName)
-            module.FEATTrawlEvent(self.parent)
-        if 'trawl' in event_name.lower():
-            #  create an instance of the event selection dialog showing
-            #  only catch events
-            eventSelectDialog = eventseldlg.EventSelDlg(self, catchOnly=True)
+            module.FEATTrawlEvent(self.parent).exec()
         else:
-            #  create an instance of the event selection dialog
-            eventSelectDialog = eventseldlg.EventSelDlg(self)
+            if 'trawl' in event_name.lower():
+                #  create an instance of the event selection dialog showing
+                #  only catch events
+                eventSelectDialog = eventseldlg.EventSelDlg(self, catchOnly=True)
+            else:
+                #  create an instance of the event selection dialog
+                eventSelectDialog = eventseldlg.EventSelDlg(self)
 
-        #  display the event select dialog
-        eventSelectDialog.exec()
+            #  display the event select dialog
+            eventSelectDialog.exec()
 
-        #  check if a event number was selected - exit if not
-        if eventSelectDialog.activeEvent is None:
-            return
+            #  check if a event number was selected - exit if not
+            if eventSelectDialog.activeEvent is None:
+                return
 
-        #  import the selected event form module
-        moduleName = 'events.' + eventDetails[0] + '.' + eventDetails[1]
-        module = importlib.import_module(moduleName)
+            #  import the selected event form module
+            moduleName = 'events.' + eventDetails[0] + '.' + eventDetails[1]
+            module = importlib.import_module(moduleName)
 
-        #  hide this dialog
-        self.hide()
+            #  hide this dialog
+            self.hide()
 
-        #  and use the handle to instantiate and start the configured event form
-        module.Event(eventSelectDialog.activeEvent, self.parent)
+            #  and use the handle to instantiate and start the configured event form
+            module.Event(eventSelectDialog.activeEvent, self.parent)
 
         #  close this dialog
         self.accept()
