@@ -853,7 +853,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             # with last four survey digits + 'SH' + speciesNumber eg 2506SH001
             dnaFinclipNum = 'dna_finclip_number'
             if measure_type == 'finclip_taken' and self.values[i] == 'Yes' and dnaFinclipNum in self.measureType:
-                speciesNum = str(self.measureModel.rowCount() + 1).zfill(3)
+                sql = ("SELECT count(*) from measurements where measurement_type='finclip_taken' and ship=" + 
+                        self.ship + 
+                        " AND survey = " + self.survey + 
+                        " AND event_id = " + self.activeHaul)
+                query = self.db.dbQuery(sql)
+                index,  = query.first()
+                
+                speciesNum = index.zfill(3)
                 dnaFinclip = self.survey[-4:] + 'SH' + speciesNum
                 sql = ("INSERT INTO measurements (ship, survey, event_id, sample_id, specimen_id, measurement_type, device_id, " +
                                     "measurement_value) VALUES (" +self.ship+","+self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey + ",'" +
