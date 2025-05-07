@@ -203,79 +203,47 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
             dup_sql = ("SELECT event_id FROM " + self.schema + ".events WHERE survey=" + self.survey + " AND ship="
                        + self.ship + " AND event_id=" + self.activeEvent + " AND gear='" + self.gear + "'")
             dup_query = self.db.dbQuery(dup_sql)
-            if not dup_query.first():
+            pres, = dup_query.first()
+            if not pres:
                 cont = 1
                 values = "(" + self.ship + "," + self.survey + "," + self.activeEvent + ",'" + self.gear + "'," \
                          + self.event_type + ",-99,'" + self.sci + "','')"
                 insert_sql = ("INSERT INTO " + self.schema + ".events (ship, survey, event_id, gear, event_type, "
                                                              "performance_code, scientist, comments) VALUES " + values)
-                query = self.db.dbQuery(insert_sql)
-                # TODO: HERE I AM!!
-                query.prepare(query_txt)
-                if query.exec_():
-                    self.db.commit()
-                    cont = 1
-                    # insert into the event_data table
-                    # get the current date
-                    cur_date = int(dt.strftime(dt.now(), "%Y%m%d"))
-                    # enter some event data for the CODEND
+                self.db.dbQuery(insert_sql)
 
-                    # enter the date of the event (EventOverallDate)
-                    values1 = "(" + self.ship + "," + self.survey + "," + self.activeEvent + ",'Codend'" + \
-                              ",'EventOverallDate'," + str(cur_date) + ")"
-                    query_txt_1 = "INSERT INTO EVENT_DATA (Ship, Survey, Event_Id, Partition, Event_Parameter, " \
-                                  "Parameter_Value) VALUES %s" % values1
-                    date_data = self.db.dbQuery()
-                    date_data.prepare(query_txt_1)
-                    if date_data.exec_():
-                        self.db.commit()
-                        cont = 1
-                        # enter the trawl scientist
-                        values2 = "(" + self.ship + "," + self.survey + "," + self.activeEvent + ",'Codend'" + \
-                                  ",'TrawlScientist','" + self.sci + "')"
-                        query_txt2 = "INSERT INTO EVENT_DATA (Ship, Survey, Event_Id, Partition, Event_Parameter, " \
-                                     "Parameter_Value) VALUES %s" % values2
-                        ev_data = self.db.dbQuery()
-                        ev_data.prepare(query_txt2)
-                        if ev_data.exec_():
-                            self.db.commit()
-                            update_txt = "UPDATE APPLICATION_CONFIGURATION SET parameter_value='%s' WHERE " \
-                                         "parameter = 'ActiveEvent'" % self.activeEvent
-                            update = self.db.dbQuery()
-                            update.prepare(update_txt)
-                            if update.exec_():
-                                self.db.commit()
-                                cont = 1
-                                self.set_cur_event()
+                # insert into the event_data table
 
-                            else:
-                                cont = 0
-                                msg = "Updating the current event in the database failed"
-                                self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg)
-                                print("update current event failed")
-                        else:
-                            cont = 0
-                            msg = "Event data 'Trawl Scientist' insert failed"
-                            self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg)
-                            print("event data scientist insert failed")
-                    else:
-                        cont = 0
-                        msg = "Event data 'EventOverallDate' insert failed"
-                        self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg)
-                        print("event data date insert failed")
-                else:
-                    cont = 0
-                    msg = "Event insert failed"
-                    self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg)
-                    print("events insert failed")
-                # self.accept()
+                # get the current date
+                cur_date = int(dt.strftime(dt.now(), "%Y%m%d"))
+
+                # enter the date of the event (EventOverallDate)
+                date_values = "(" + self.ship + "," + self.survey + "," \
+                              + self.activeEvent + ",'Codend','EventOverallDate'," + str(cur_date) + ")"
+                date_sql = ("INSERT INTO " + self.schema + ".event_data (Ship, Survey, Event_Id, Partition, "
+                                                           "Event_Parameter, Parameter_Value) VALUES %s" % date_values)
+                self.db.dbQuery(date_sql)
+
+                # enter the trawl scientist
+                sci_vals = "(" + self.ship + "," + self.survey + "," \
+                           + self.activeEvent + ",'Codend','TrawlScientist','" + self.sci + "')"
+                sci_sql = ("INSERT INTO " + self.schema + ".event_data (Ship, Survey, Event_Id, Partition, "
+                                                          "Event_Parameter, Parameter_Value) VALUES %s" % sci_vals)
+                self.db.dbQuery(sci_sql)
+
+                # set the current event in the application_configuration table
+                update_sql = ("UPDATE " + self.schema + ".application_configuration SET parameter_value='"
+                              + self.activeEvent + "' WHERE parameter = 'ActiveEvent'")
+                self.db.dbQuery(update_sql)
+                self.set_cur_event()
             else:
                 cont = 0
                 msg = "That event already exists in the database"
                 self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg)
+                self.message.show()
                 print("duplicate entry")
-            #if cont == 1:
-                #self.accept()
+            if cont == 1:
+                self.accept()
 
     def check_active(self):
         """
@@ -407,8 +375,8 @@ class AddParams(QDialog, ui_FEATEventParams.Ui_Dialog):
         self.fill_combos()
 
         # hide the trawl scientist
-        self.label_3.hide()
-        self.cb_sci.hide()
+        # self.label_3.hide()
+        # self.cb_sci.hide()
 
         # set slots
         self.pb_ok.clicked.connect(self.add_params)
@@ -422,13 +390,15 @@ class AddParams(QDialog, ui_FEATEventParams.Ui_Dialog):
         :return:
         """
         # get gear list
-        gear = self.db.dbQuery("SELECT gear FROM GEAR WHERE active=1")
-        for g, in gear:
-            self.cb_gear.addItem(g)
+        gear_sql = "SELECT gear FROM GEAR WHERE active=1"
+        gear_query = self.db.dbQuery(gear_sql)
+        for gear, in gear_query:
+            self.cb_gear.addItem(gear)
 
         # get event_types
-        e_types = self.db.dbQuery("SELECT description FROM EVENT_TYPES")
-        for description, in e_types:
+        e_sql = "SELECT description FROM EVENT_TYPES"
+        e_query = self.db.dbQuery(e_sql)
+        for description, in e_query:
             self.cb_event_type.addItem(description)
 
         # get scientists
@@ -445,7 +415,7 @@ class AddParams(QDialog, ui_FEATEventParams.Ui_Dialog):
         self.sci = self.cb_sci.currentText()
         desc = self.cb_event_type.currentText()
         # get event_type_id
-        ev_type = self.db.dbQuery("SELECT event_type FROM EVENT_TYPES where description = '" + desc + "'")
-        ev_type.first()
-        self.event_type = ev_type.value(0).toString()
+        ev_sql = ("SELECT event_type FROM EVENT_TYPES where description = '" + desc + "'")
+        ev_query = self.db.dbQuery(ev_sql)
+        self.event_type, = ev_query.first()
         self.accept()
