@@ -178,7 +178,7 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
         temp_event = self.lw_events.currentItem().text().split("\t")
         self.activeEvent = temp_event[0]
         update_ac_sql = ("UPDATE " + self.schema + ".application_configuration SET parameter_value='"
-                         + str(self.activeEvent) + " WHERE parameter='ActiveEvent'")
+                         + str(self.activeEvent) + "' WHERE parameter='ActiveEvent'")
         self.db.dbQuery(update_ac_sql)
         update_ev_sql = ("UPDATE " + self.schema + ".events SET performance_code=-99 WHERE event_id="
                          + self.activeEvent)

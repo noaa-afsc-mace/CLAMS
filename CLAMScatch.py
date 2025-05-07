@@ -843,7 +843,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.basketTable.setRowCount(0)
         basketCount = 0
 
-        if (self.settings['OrganizationName'] == 'SWFSC'):
+        if 'swfsc' in self.settings['OrganizationName'].lower():
             headerItem = QTableWidgetItem("Weight (kg)")
         else:
             headerItem = QTableWidgetItem("Weight")
@@ -1277,7 +1277,8 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             return
 
         # update database - first check if this is a non-count basket type
-        if editDlg.count == '-':
+        # AB - I don't know if you all had checked this, but the count is blank so I had to change this to make it work
+        if editDlg.count == '':
             #  this is not a count basket - set count to NULL
             editDlg.count = 'NULL'
 
@@ -1292,6 +1293,9 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.freeze=False
 
         self.updateTables()
+
+        #  refresh the species list
+        self.reloadSpeciesList()
 
 
     def exitValidation(self):
@@ -1441,11 +1445,15 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         headerItem = QTableWidgetItem("Parent")
         headerItem.setFont(self.headerFont)
         self.speciesList.setHorizontalHeaderItem(1, headerItem)
-        headerItem = QTableWidgetItem("Type")
+        if 'swfsc' in self.settings['OrganizationName'].lower() or 'nwfsc' in self.settings['OrganizationName'].lower():
+            headerItem = QTableWidgetItem("Tot Wt")
+        else:
+            headerItem = QTableWidgetItem("Type")
         headerItem.setFont(self.headerFont)
         self.speciesList.setHorizontalHeaderItem(2, headerItem)
 
         #  loop thru the samples and add them to the species list table
+        # todo: AB - this would be nice if it could be ordered by the parent and then the sample_id
         sql = ("SELECT samples.sample_id, species.common_name, species.scientific_name," +
                 "species.species_code, samples.parent_sample, samples.subcategory"+
                 " FROM samples, species WHERE samples.species_code=species.species_code AND " +
