@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
-    <height>725</height>
+    <width>1580</width>
+    <height>1045</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -24,9 +24,53 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_4">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="40,25,35">
+    <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="40,0,35">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QLabel" name="haulLabel">
+         <property name="font">
+          <font>
+           <family>Arial Black</family>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Haul</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="haulNum">
+         <property name="font">
+          <font>
+           <family>Arial Black</family>
+           <pointsize>14</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="layoutDirection">
+          <enum>Qt::LeftToRight</enum>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">QWidget {
+    background-color: white;
+}</string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::Panel</enum>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
        <item>
         <widget class="QLabel" name="label_11">
          <property name="font">
@@ -94,7 +138,7 @@
          </column>
          <column>
           <property name="text">
-           <string>Type</string>
+           <string>Wt</string>
           </property>
          </column>
         </widget>
@@ -103,6 +147,9 @@
      </item>
      <item>
       <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <layout class="QFormLayout" name="formLayout"/>
+       </item>
        <item>
         <widget class="QLabel" name="picLabel">
          <property name="minimumSize">

@@ -16,6 +16,7 @@ class Clamsbase2Functions(object):
         self.oldway_mix=False
 
         #  make sure we have the bioschema attribute
+        self.db.bioSchema = self.db.label
         if not hasattr(self.db, 'bioSchema'):
             self.db.bioSchema = 'clamsbase2'
 

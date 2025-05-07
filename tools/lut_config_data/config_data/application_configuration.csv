@@ -18,4 +18,4 @@
 "SCSVersion","5","Version of SCS software. This is used to determine the method used to connect to SCS."
 "CheckForPreviousOccurrence","True","If True, CLAMS will check for the ""Previous_Occurrence"" species_data attribute when adding species to the catch and alert the user if a new species is encountered. It will add/update this attribute if the user adds the species. If False, CLAMS does not check if you have seen this species before or not."
 "AllowEventChangeWhileProcessing","True","If set to True, a workstation can open a new event before the previous event has closed out. This should be used with care since it is easy to load data into the wrong event when you allow multiple events to be worked on at once."
-"OrganizationName","NOAA/AFSC/RACE/MACE","Set this to your organizations name or other string that will be used as a title on all labels"
+"OrganizationName","SWFSC","Set this to your organizations name or other string that will be used as a title on all labels"

@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\Users\rick.towler\Work\noaa-afsc-mace\CLAMS\ui\CLAMSCatch.ui'
+# Form implementation generated from reading ui file 'C:\Users\Melina.Shak\Documents\CLAMS_WPy64-31260\CLAMS\ui\CLAMSCatch.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -13,7 +13,7 @@ class Ui_clamsCatch(object):
     def setupUi(self, clamsCatch):
         clamsCatch.setObjectName("clamsCatch")
         clamsCatch.setWindowModality(QtCore.Qt.WindowModality.NonModal)
-        clamsCatch.resize(1000, 725)
+        clamsCatch.resize(1580, 1045)
         clamsCatch.setMinimumSize(QtCore.QSize(750, 600))
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(clamsCatch)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
@@ -21,6 +21,31 @@ class Ui_clamsCatch(object):
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout()
         self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.haulLabel = QtWidgets.QLabel(parent=clamsCatch)
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.haulLabel.setFont(font)
+        self.haulLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.haulLabel.setObjectName("haulLabel")
+        self.verticalLayout_3.addWidget(self.haulLabel)
+        self.haulNum = QtWidgets.QLabel(parent=clamsCatch)
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.haulNum.setFont(font)
+        self.haulNum.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.haulNum.setStyleSheet("QWidget {\n"
+"    background-color: white;\n"
+"}")
+        self.haulNum.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        self.haulNum.setText("")
+        self.haulNum.setObjectName("haulNum")
+        self.verticalLayout_3.addWidget(self.haulNum)
         self.label_11 = QtWidgets.QLabel(parent=clamsCatch)
         font = QtGui.QFont()
         font.setFamily("Arial Black")
@@ -59,6 +84,9 @@ class Ui_clamsCatch(object):
         self.horizontalLayout_2.addLayout(self.verticalLayout_3)
         self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
+        self.formLayout = QtWidgets.QFormLayout()
+        self.formLayout.setObjectName("formLayout")
+        self.verticalLayout.addLayout(self.formLayout)
         self.picLabel = QtWidgets.QLabel(parent=clamsCatch)
         self.picLabel.setMinimumSize(QtCore.QSize(200, 200))
         font = QtGui.QFont()
@@ -188,7 +216,6 @@ class Ui_clamsCatch(object):
         self.verticalLayout_2.addWidget(self.basketTable)
         self.horizontalLayout_2.addLayout(self.verticalLayout_2)
         self.horizontalLayout_2.setStretch(0, 40)
-        self.horizontalLayout_2.setStretch(1, 25)
         self.horizontalLayout_2.setStretch(2, 35)
         self.verticalLayout_4.addLayout(self.horizontalLayout_2)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
@@ -266,13 +293,14 @@ class Ui_clamsCatch(object):
     def retranslateUi(self, clamsCatch):
         _translate = QtCore.QCoreApplication.translate
         clamsCatch.setWindowTitle(_translate("clamsCatch", "CLAMS Catch"))
+        self.haulLabel.setText(_translate("clamsCatch", "Haul"))
         self.label_11.setText(_translate("clamsCatch", "Samples"))
         item = self.speciesList.horizontalHeaderItem(0)
         item.setText(_translate("clamsCatch", "Species"))
         item = self.speciesList.horizontalHeaderItem(1)
         item.setText(_translate("clamsCatch", "Parent"))
         item = self.speciesList.horizontalHeaderItem(2)
-        item.setText(_translate("clamsCatch", "Type"))
+        item.setText(_translate("clamsCatch", "Wt"))
         self.picLabel.setText(_translate("clamsCatch", "<Image Here>"))
         self.addspcBtn.setText(_translate("clamsCatch", "Add Species"))
         self.label_8.setText(_translate("clamsCatch", "Summary Table"))

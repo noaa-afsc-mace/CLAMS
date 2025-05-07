@@ -90,5 +90,5 @@ class Ui_sexUnknownDlg(object):
         self.label.setText(_translate("sexUnknownDlg", "Select the sex..."))
         self.maleBtn.setText(_translate("sexUnknownDlg", "Male"))
         self.femaleBtn.setText(_translate("sexUnknownDlg", "Female"))
-        self.unsexedBtn.setText(_translate("sexUnknownDlg", "Unsexed"))
-        self.unknownBtn.setText(_translate("sexUnknownDlg", "Unknown"))
+        self.unsexedBtn.setText(_translate("sexUnknownDlg", "Unknown"))
+        self.unknownBtn.setText(_translate("sexUnknownDlg", "Not Opened"))

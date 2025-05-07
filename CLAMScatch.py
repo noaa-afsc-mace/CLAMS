@@ -152,6 +152,9 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         checkHaulTimer.timeout.connect(self.formInit)
         checkHaulTimer.start(0)
 
+        # set the event number
+        self.haulNum.setText(self.activeHaul)
+
 
     def formInit(self):
         '''formInit is called immediately after the form is presented on
@@ -628,7 +631,10 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.message.exec()
             return
 
-        self.numpad.msgLabel.setText("Enter the Weight")
+        if (self.settings['OrganizationName'] == 'SWFSC'):
+            self.numpad.msgLabel.setText("Enter the Weight (kg)")
+        else:
+            self.numpad.msgLabel.setText("Enter the Weight")
         if not self.numpad.exec():
             return
 
@@ -814,6 +820,15 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         # update the GUI
         self.updateTables()
 
+        #  update total wt in species table
+        sql = ("SELECT sum(weight) FROM baskets where sample_id=" 
+                + self.activeSampleKey 
+                + " group by sample_id")
+        wtQuery = self.db.dbQuery(sql)
+        wt, = wtQuery.first()
+        item = self.speciesList.findItems(self.activeSpcName,  Qt.MatchFlag.MatchExactly)
+        self.speciesList.setItem(item[0].row(), 2, QTableWidgetItem(wt))
+
         #  we're done with this basket - unfreeze
         self.freeze = False
 
@@ -828,7 +843,11 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.basketTable.setRowCount(0)
         basketCount = 0
 
-        headerItem = QTableWidgetItem("Weight")
+        if (self.settings['OrganizationName'] == 'SWFSC'):
+            headerItem = QTableWidgetItem("Weight (kg)")
+        else:
+            headerItem = QTableWidgetItem("Weight")
+
         headerItem.setFont(self.headerFont)
         self.basketTable.setHorizontalHeaderItem(0, headerItem)
         headerItem = QTableWidgetItem("Count")
@@ -1478,6 +1497,13 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 myParent = parentName
             else:
                 myParent = ''
+            
+            #  get the total basket wt
+            sql = ("SELECT sum(weight) FROM baskets where sample_id=" 
+                   + sampleId 
+                   + " group by sample_id")
+            wtQuery = self.db.dbQuery(sql)
+            wt, = wtQuery.first()
 
             #  add this sample to the table
             self.speciesList.insertRow(nSamples)
@@ -1486,6 +1512,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.speciesList.setVerticalHeaderItem(nSamples,headerItem)
             self.speciesList.setItem(nSamples, 0, QTableWidgetItem(name))
             self.speciesList.setItem(nSamples, 1, QTableWidgetItem(myParent))
+            self.speciesList.setItem(nSamples, 2, QTableWidgetItem(wt))
             nSamples += 1
             self.speciesDict.update({species:spCode})
         self.speciesList.resizeColumnsToContents()

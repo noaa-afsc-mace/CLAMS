@@ -88,7 +88,7 @@ class NoOvaryWhenMale(QObject):
         # figure out the rule
         if values[measurements.index('sex')] is not None:
             sex=str(values[measurements.index('sex')])
-            if (sex.lower() == 'male'):
+            if (sex.lower() != 'female'):
                 try:
                     result[measurements.index('ovary_taken')]=False
                     result[measurements.index('gonad_weight')]=False

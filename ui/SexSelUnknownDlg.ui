@@ -109,7 +109,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Unsexed</string>
+       <string>Unknown</string>
       </property>
      </widget>
     </item>
@@ -134,7 +134,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Unknown</string>
+       <string>Not Opened</string>
       </property>
      </widget>
     </item>

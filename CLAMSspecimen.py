@@ -131,6 +131,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.numpad = numpad.NumPad(self)
         self.message = messagedlg.MessageDlg(self)
 
+        #  set the event number
+        self.haulNum.setText(self.activeHaul)
+
         # if there is a printer set up, initialize the printer and add the sound
         if 'Label_Printer' in self.deviceData:
             #  initialize the Label Printer
@@ -576,20 +579,27 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             #  check if this is a manually entered value or from a device
             if (self.manualFlag):
-                #  this value is entered manually - display the number pad
-                self.numpad.msgLabel.setText("Enter " + self.label[i])
-                if not self.numpad.exec():
-                    #  user cancelled action
-                    return
-                #  get the number from the numpad and unset manualFlag value
-                val = self.numpad.value
-                #  check that we didn't get a 0 weight
-                if (val == '0'):
-                    self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You have entered 0 (zero) "
-                        "for the basket weight which is not allowed. If your sample is too small to register " +
-                        "on the scale, you should enter 0.001", 'info')
-                    self.message.exec()
-                    return
+                if (self.settings['OrganizationName'] == 'SWFSC' and 
+                    (self.measureType[i] == 'barcode' 
+                    or self.measureType[i] == 'dna_finclip_number')):
+                    keyDialog = keypad.KeyPad(self.comment, self)
+                    keyDialog.exec()
+                    val = keyDialog.dispEdit.toPlainText()
+                else:
+                    #  this value is entered manually - display the number pad
+                    self.numpad.msgLabel.setText("Enter " + self.label[i])
+                    if not self.numpad.exec():
+                        #  user cancelled action
+                        return
+                    #  get the number from the numpad and unset manualFlag value
+                    val = self.numpad.value
+                    #  check that we didn't get a 0 weight
+                    if (val == '0'):
+                        self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You have entered 0 (zero) "
+                            "for the basket weight which is not allowed. If your sample is too small to register " +
+                            "on the scale, you should enter 0.001", 'info')
+                        self.message.exec()
+                        return
                 self.manualFlag = False
 
             elif not (self.serialValue == None):
@@ -705,18 +715,25 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         else:
             #  check if this is a manually entered value or from a device
             if self.manualFlag:
-                #  this value is entered manually
-                self.numpad.msgLabel.setText("Enter " + self.label[i])
-                if not self.numpad.exec():
-                    return
-                val = self.numpad.value
-                #  check that we didn't get a 0 weight
-                if (val == '0'):
-                    self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You have entered 0 (zero) "
-                        "for the basket weight which is not allowed. If your sample is too small to register " +
-                        "on the scale, you should enter 0.001", 'info')
-                    self.message.exec()
-                    return
+                if (self.settings['OrganizationName'] == 'SWFSC' and 
+                    (self.measureType[i] == 'barcode' or 
+                    self.measureType[i] == 'dna_finclip_number')):
+                    keyDialog = keypad.KeyPad(self.comment, self)
+                    keyDialog.exec()
+                    val = keyDialog.dispEdit.toPlainText()
+                else:
+                    #  this value is entered manually
+                    self.numpad.msgLabel.setText("Enter " + self.label[i])
+                    if not self.numpad.exec():
+                        return
+                    val = self.numpad.value
+                    #  check that we didn't get a 0 weight
+                    if (val == '0'):
+                        self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You have entered 0 (zero) "
+                            "for the basket weight which is not allowed. If your sample is too small to register " +
+                            "on the scale, you should enter 0.001", 'info')
+                        self.message.exec()
+                        return
                 self.manualFlag = False
 
             elif not self.serialValue == None:
@@ -831,6 +848,20 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                                     measure_type + "'," + self.devices[i] + ",'" +
                                     self.values[i] + "')")
             self.db.dbExec(sql)
+
+            # When finClip taken marked as true, then autofill dna_finclip_number
+            # with last four survey digits + 'SH' + speciesNumber eg 2506SH001
+            dnaFinclipNum = 'dna_finclip_number'
+            if measure_type == 'finclip_taken' and self.values[i] == 'Yes' and dnaFinclipNum in self.measureType:
+                speciesNum = str(self.measureModel.rowCount() + 1).zfill(3)
+                dnaFinclip = self.survey[-4:] + 'SH' + speciesNum
+                sql = ("INSERT INTO measurements (ship, survey, event_id, sample_id, specimen_id, measurement_type, device_id, " +
+                                    "measurement_value) VALUES (" +self.ship+","+self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey + ",'" +
+                                    dnaFinclipNum + "'," + self.devices[i] + ",'" +
+                                    dnaFinclip + "')")
+                self.db.dbExec(sql)
+                self.buttons[i+1].setStyleSheet("background-color: green")
+
             # update table
             self.updateMeasureView()
             # check conditionals
@@ -1031,7 +1062,6 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                   " AND sample_id="+self.activeSample+
                   " AND PROTOCOL_NAME = '" + self.protocol + "' AND WORKSTATION_ID = " +
                   self.workStation + sqlStringEnd + "ORDER BY SPECIMEN_ID")
-            print(sql)
             self.measureModel.setQuery(sql, self.db.db)
 
 
