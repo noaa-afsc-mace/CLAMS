@@ -835,7 +835,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                                    self.values[i] + "' WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
                                    " AND sample_id="+self.activeSample+" AND specimen_id = " +self.specimenKey + " AND measurement_type = '" +
                                    measure_type+"'")
-            self.db.dbExec(sql)
+            try:
+                self.db.dbExec(sql)
+            except:
+                self.message.setMessage(self.errorIcons[2],self.errorSounds[2], 
+                                        "An invalid value has been entered for field: " +
+                                        measure_type +
+                                        " please resolve before proceeding")
+                self.message.exec()
             # update table
             self.updateMeasureView()
             # check conditionals
@@ -847,7 +854,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                                     "measurement_value) VALUES (" +self.ship+","+self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey + ",'" +
                                     measure_type + "'," + self.devices[i] + ",'" +
                                     self.values[i] + "')")
-            self.db.dbExec(sql)
+            try:
+                self.db.dbExec(sql)
+            except:
+                self.message.setMessage(self.errorIcons[2],self.errorSounds[2], 
+                                        "An invalid value has been enterd for field: " +
+                                        measure_type + 
+                                        " please resolve before proceeding")
+                self.message.exec()
 
             # When finClip taken marked as true, then autofill dna_finclip_number
             # with last four survey digits + 'SH' + speciesNumber eg 2506SH001
@@ -1527,7 +1541,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                     break
 
         #  get data from db - query everything *BUT* length
-        sql = ("SELECT ship, survey, haul, specimen_id, species_code, common_name, "+
+        sql = ("SELECT ship, survey, event_id, specimen_id, species_code, common_name, "+
                 "organism_weight, sex, maturity, scientist, barcode FROM v_specimen_measurements WHERE "+
                 "survey=" + self.survey +" AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
         query = self.db.dbQuery(sql)
@@ -1587,7 +1601,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                         " AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
                     query = self.db.dbQuery(sql)
                     data  = query.first()
-                    length = data[1]
+                    length = data[0]
                     ind = lengthType.find('_')+1
                     if ind != 0:
                         lt = lengthType[0].upper()+lengthType[ind].upper()

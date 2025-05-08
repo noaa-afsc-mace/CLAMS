@@ -142,7 +142,7 @@ class CLAMSMain(QMainWindow, ui_CLAMSMain.Ui_clamsMain):
         try:
             #  the background image is based on the app version number
             imFile = (self.settings['ImageDir'] + '/backgrounds/' +
-                    os.sep + self.version + ".png")
+                    os.sep + homeScreenImg + ".png")
             imFile = os.path.normpath(imFile)
 
             #  the image URL must use forward slashes
@@ -692,6 +692,7 @@ if __name__ == "__main__":
     dataSource = initSettings.value('ODBC_Data_Source', '')
     user = initSettings.value('User', '')
     password = initSettings.value('Password', '')
+    homeScreenImg = initSettings.value('HomeScreenImg', '')
 
     #  extract the application paths and settings
     settings = {}

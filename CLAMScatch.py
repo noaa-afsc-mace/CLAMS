@@ -725,7 +725,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         '''
         #  check basket weight against the max allowed basket weight
-        if float(self.currentBasketWt) > float(self.settings['MaxBasketWt']):
+        if self.currentBasketWt and float(self.currentBasketWt) > float(self.settings['MaxBasketWt']):
             self.message.setMessage(self.errorIcons[1],self.errorSounds[1], self.firstName +
                     ", this Basket exceeds the maximum basket weight of " +
                     self.settings['MaxBasketWt']+".  Does this bother you?", 'choice')
@@ -815,7 +815,14 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                     "weight,device_id) VALUES ("+ self.ship+", "+self.survey+","+self.activeHaul +
                     ","+self.activeSampleKey+",'"+self.basketType+"',"+self.count+"," +
                     str(self.currentBasketWt)+","+self.activeDeviceId+")")
-        self.db.dbExec(sql)
+        try:
+            self.db.dbExec(sql)
+        except:
+            self.message.setMessage(self.errorIcons[2],self.errorSounds[2],
+                                    "An invalid basket weight of  " + 
+                                    str(self.currentBasketWt) + 
+                                    " was entered, please fix this before proceeding")
+            self.message.exec()
 
         # update the GUI
         self.updateTables()
