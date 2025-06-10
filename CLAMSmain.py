@@ -249,6 +249,8 @@ class CLAMSMain(QMainWindow, ui_CLAMSMain.Ui_clamsMain):
         setting up the main window.
         '''
 
+        print('hellooo')
+
         #  determine if we're connecting to an Oracle, postgres, or "other"
         #  database. Since the Oracle driver does not ship compiled with
         #  Qt, we use ODBC for Oracle. Postgres uses the Qt "native" postgres
