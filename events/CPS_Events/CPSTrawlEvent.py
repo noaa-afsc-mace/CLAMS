@@ -483,8 +483,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
             self.display_time('overall', True)
         elif Events.NetInWater.name in self.button_order:
             self.event_time = self.event_time.addSecs(overall_elapsed)
-            self.event_timer.timeout.connect(lambda: self.display_time('overall'))
-            self.event_timer.start(1000)
+            if not self.event_timer.isActive():
+                self.event_timer.timeout.connect(lambda: self.display_time('overall'))
+                self.event_timer.start(1000)
         # if HB is pressed, get elapsed time
         if td_elapsed > 0 and Events.Haulback.name in self.button_order:
             at_depth_time = self.td_time.secsTo(self.hb_time)
@@ -492,8 +493,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
             self.display_time(Events.EQ.name, True)
         elif Events.EQ.name in self.button_order:
             self.tow_time = self.tow_time.addSecs(td_elapsed)
-            self.td_timer.timeout.connect(lambda: self.display_time('td'))
-            self.td_timer.start(1000)
+            if not self.td_timer.isActive():
+                self.td_timer.timeout.connect(lambda: self.display_time('td'))
+                self.td_timer.start(1000)
 
         self.dataTable.resizeColumnsToContents()
 
@@ -685,8 +687,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
 
         # deal with the timers and buttons
         if Events.EQ.name == paramName:
-            self.td_timer.timeout.connect(lambda: self.display_time('td'))
-            self.td_timer.start(1000)
+            if not self.td_timer.isActive():
+                self.td_timer.timeout.connect(lambda: self.display_time('td'))
+                self.td_timer.start(1000)
             # if TD is pressed, send up net dimensions
             self.net_btn = Events.EQ.name
             self.get_net_dims()
@@ -705,8 +708,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
             self.recording = True
             self.disable_enable_buttons('enable', self.pb_abort)
             # set the timer
-            self.event_timer.timeout.connect(lambda: self.display_time('overall'))
-            self.event_timer.start(1000)
+            if not self.event_timer.isActive():
+                self.event_timer.timeout.connect(lambda: self.display_time('overall'))
+                self.event_timer.start(1000)
         elif Events.NetOnDeck.name in paramName:
             # if NOD is pressed, enable the done button, turn off the recording of SCS data, and stop overall timer
             self.disable_enable_buttons('enable', self.doneBtn)
