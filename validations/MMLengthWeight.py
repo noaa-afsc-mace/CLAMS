@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class MMLengthWeight(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -64,7 +64,7 @@ class MMLengthWeight(QObject):
         #  the species_data table
 
         #  Get the valid length weight parameters for this species from the species table
-        sql=("SELECT parameter_value FROM species_data WHERE species_code="+speciesCode+
+        sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+speciesCode+
              " AND subcategory='"+subcategory+"' AND lower(species_parameter)='a_param'")
         query = db.dbQuery(sql)
         aParam, = query.first()
@@ -75,7 +75,7 @@ class MMLengthWeight(QObject):
         else:
             self.aParm = None
 
-        sql=("SELECT parameter_value FROM species_data WHERE species_code="+speciesCode+
+        sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+speciesCode+
              " AND subcategory='"+subcategory+"' AND lower(species_parameter)='b_param'")
         query = db.dbQuery(sql)
         bParam, = query.first()
@@ -87,7 +87,7 @@ class MMLengthWeight(QObject):
             self.bParm = None
 
         # get the allowable deviation tolerance
-        sql = "SELECT parameter_value FROM application_configuration WHERE lower(parameter)='lw_tolerance'"
+        sql = "SELECT parameter_value FROM " + schema + ".application_configuration WHERE lower(parameter)='lw_tolerance'"
         query = db.dbQuery(sql)
         lwTolerance, = query.first()
         if lwTolerance:

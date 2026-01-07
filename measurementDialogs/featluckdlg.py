@@ -85,6 +85,7 @@ class FEATLuckDlg(QDialog, ui_FEATLuckDlg.Ui_Dialog):
         self.errorIcons = parent.errorIcons
         self.errorSounds = parent.errorSounds
         self.db = parent.db
+        self.schema = parent.schema
 
         # set check boxes to checked
         self.cb_nad.setChecked(True)
@@ -117,7 +118,7 @@ class FEATLuckDlg(QDialog, ui_FEATLuckDlg.Ui_Dialog):
 
         # set the sample number label
         # get the last five of the otolith
-        sql = "SELECT measurement_value FROM Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
+        sql = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
               " AND event_id=" + self.active_event + " AND sample_id=" + self.active_sample + \
               " AND specimen_id=" + self.specimen_key + " AND measurement_type = 'barcode'"
         query = self.db.dbQuery(sql)
@@ -133,7 +134,7 @@ class FEATLuckDlg(QDialog, ui_FEATLuckDlg.Ui_Dialog):
         :return:
         """
         if self.specimen_key is not None:
-            exist_sql = "SELECT measurement_value FROM Measurements WHERE ship=" + self.ship + \
+            exist_sql = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + \
                         " AND survey=" + self.survey + " AND event_id=" + self.active_event + \
                         " AND sample_id=" + self.active_sample + " AND specimen_id=" + self.specimen_key + \
                         " AND measurement_type = 'barcode'"
@@ -149,7 +150,7 @@ class FEATLuckDlg(QDialog, ui_FEATLuckDlg.Ui_Dialog):
         """
         measures_to_load = ['liver_rna', 'gonad_rna', 'liver_taken']
         for measure in measures_to_load:
-            query_txt = "SELECT measurement_value FROM Measurements WHERE measurement_type = '%s' " \
+            query_txt = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE measurement_type = '%s' " \
                         "AND specimen_id = %s" % (measure, self.specimen_key)
             query = self.db.dbQuery(query_txt)
             if query.first():

@@ -248,14 +248,14 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         self.sensorMonitor.SensorError.connect(self.device_error)
 
         #  get the devices attached to this workstation
-        self.deviceData = devices.getDevices(self.db, self.workStation)
+        self.deviceData = devices.getDevices(self.db, self.workStation, self.schema)
         
         #  set up each device
         for deviceName in self.deviceData:
             #  try to get the configuration parameters for this device
             #  this will fail if a required parameter is missing.
             try:
-                deviceParams = devices.getDeviceParameters(self.db, deviceName,
+                deviceParams = devices.getDeviceParameters(self.db, self.schema, deviceName,
                                                            self.deviceData[deviceName]['id'],
                                                            self.deviceData[deviceName]['interface'])
             except Exception as e:
@@ -397,7 +397,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         td_elapsed = 0
 
         # get event types entered by timestamp
-        ev_sql = ("SELECT event_parameter, to_char(to_timestamp(parameter_value,'MMDDYYYY HH24:MI:SS.FF3')) AS times "
+        ev_sql = ("SELECT event_parameter, " + self.db.formatTimeStamp("parameter_value") + " AS times "
                   "FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
                   " AND event_id=" + self.activeEvent + " AND partition='MainTrawl' AND event_parameter IN "
                                                         "('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM01', 'COM02', "
@@ -713,9 +713,9 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         self.dataTable.setItem(self.cur_dt_row, 0, QTableWidgetItem(self.cur_btn_txt))
         self.dataTable.setItem(self.cur_dt_row, 1, QTableWidgetItem(self.cur_time))
         if self.dispVector:
-            self.dataTable.setItem(self.cur_dt_row, 2, QTableWidgetItem(self.dispVector[0]))
-            self.dataTable.setItem(self.cur_dt_row, 3, QTableWidgetItem(self.dispVector[1]))
-            self.dataTable.setItem(self.cur_dt_row, 4, QTableWidgetItem(self.dispVector[2]))
+            # iterate through SCS lat, long, and depth an display in table
+            for val in self.dispVector:
+                self.dataTable.setItem(self.cur_dt_row, val + 2, QTableWidgetItem(self.dispVector[val]))
         self.dataTable.resizeColumnsToContents()
 
         # deal with the timers and buttons

@@ -75,6 +75,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
 
         #  copy some info from parent for convenience
         self.db = parent.db
+        self.schema = parent.schema
         self.workStation = parent.workStation
         self.activeHaul = parent.activeHaul
         self.survey = parent.survey
@@ -152,7 +153,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
 
         # get the basic event information
         sql = ("SELECT gear, event_type, performance_code, scientist, comments " +
-                    "FROM events WHERE ship=" + self.ship + " AND survey=" + self.survey +
+                    "FROM " + self.schema + ".events WHERE ship=" + self.ship + " AND survey=" + self.survey +
                     " AND event_id=" + self.activeHaul)
         query = self.db.dbQuery(sql)
         self.gear, event_type, perf_code, trawl_sci, comments = query.first()
@@ -197,7 +198,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #           these nets are deployed with a flow meter and the haul form buttons
         #           are configured to capture the flow meter readings.
 
-        sql = ("SELECT gear_type FROM gear WHERE gear='" + self.gear + "'")
+        sql = ("SELECT gear_type FROM " + self.schema + ".gear WHERE gear='" + self.gear + "'")
         query = self.db.dbQuery(sql)
         self.gearType, = query.first()
         self.haulInfo = []
@@ -216,7 +217,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  populate Haul Info
         for i, partition  in enumerate(self.partitions):
             for j, parameter  in enumerate(self.parameters):
-                sql = ("SELECT event_data.parameter_value FROM event_data WHERE event_data.ship="+
+                sql = ("SELECT event_data.parameter_value FROM " + self.schema + ".event_data WHERE event_data.ship="+
                         self.ship+ " AND event_data.survey=" + self.survey+ " AND event_data.event_id=" +
                         self.activeHaul + " AND event_data.partition='" + partition +
                         "' AND event_data.event_parameter = '" + parameter + "'")
@@ -299,7 +300,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
 
         #  now check if the 2nd codend was deployed - determined by the
         #  presence of EQ for the 2nd codend
-        sql = ("SELECT parameter_value FROM event_data WHERE ship=" + self.ship + " AND survey=" +
+        sql = ("SELECT parameter_value FROM  " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" +
                 self.survey + " AND event_id=" + self.activeHaul +
                 " AND partition='Codend_2' AND event_parameter='EQ'")
         query = self.db.dbQuery(sql)
@@ -317,7 +318,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
 
         #  now check if the 3rd codend was deployed - determined by the
         #  presence of EQ for the 3rd codend
-        sql = ("SELECT parameter_value FROM event_data WHERE ship=" + self.ship + " AND survey=" +
+        sql = ("SELECT parameter_value FROM  " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" +
                 self.survey + " AND event_id=" + self.activeHaul +
                 " AND partition='Codend_3' AND event_parameter='EQ'")
         query = self.db.dbQuery(sql)
@@ -459,20 +460,20 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         # Insert or update the haul parameters and values for each main partition
         for i, partition in enumerate(self.partitions):
             for j, parameter in enumerate(self.parameters):
-                sql = ("SELECT event_parameter FROM event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
+                sql = ("SELECT event_parameter FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
                        " AND event_id=" + self.activeHaul + " AND partition='" + partition +
                        "' AND event_parameter='" + parameter + "'")
                 query = self.db.dbQuery(sql)
                 val, = query.first()
                 if val is not None:
                     #  There is an existing record - update it with new values
-                    sql = ("UPDATE event_data SET parameter_value='" + self.haulInfoBtns[j][i].text() +
+                    sql = ("UPDATE " + self.schema + ".event_data SET parameter_value='" + self.haulInfoBtns[j][i].text() +
                         "' WHERE ship=" + self.ship + " AND survey=" + self.survey + " AND event_id=" +
                         self.activeHaul + " AND partition='" + partition +
                         "' AND event_parameter='" + parameter + "'")
                 else:
                     #  This is a new record - insert it
-                    sql = ("INSERT INTO event_data (ship, survey, event_id, partition, event_parameter," +
+                    sql = ("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, event_parameter," +
                         " parameter_value) VALUES ("+ self.ship + "," + self.survey + "," +
                         self.activeHaul + ",'" + partition + "','" + parameter +
                         "','" + self.haulInfoBtns[j][i].text() + "')")
@@ -481,7 +482,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  Now update the haul info data for pocketnets (i.e. partitions named like
         #  'pocketnet' or 'pnet'). These are ALWAYS set to "not_subsampled".
         #  first query the pocketnet partitions.
-        sql = ("SELECT partition FROM GEAR_OPTIONS, EVENTS WHERE GEAR_OPTIONS.GEAR = " +
+        sql = ("SELECT partition FROM " + self.schema + ".GEAR_OPTIONS, " + self.schema + ".EVENTS WHERE GEAR_OPTIONS.GEAR = " +
                 "EVENTS.GEAR and EVENTS.SHIP = " + self.ship + "  AND  " + "EVENTS.SURVEY = " +
                 self.survey + " AND EVENTS.EVENT_ID = " + self.activeHaul +
                 " AND (LOWER(GEAR_OPTIONS.PARTITION) LIKE 'p-net' OR " +
@@ -493,7 +494,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  and insert the PartitionWeightType and PartitionWeight parameters into event_data.
         for pnet_partition, in query:
             #  check if the haul info is already in the database for this partition
-            sql = ("SELECT event_data.event_parameter FROM event_data WHERE event_data.ship = " +
+            sql = ("SELECT event_data.event_parameter FROM " + self.schema + ".event_data WHERE event_data.ship = " +
                     self.ship + "  AND event_data.SURVEY = " + self.survey + " AND event_data.EVENT_ID = " +
                     self.activeHaul + " AND event_data.partition = '" + pnet_partition +
                     "' AND event_data.event_parameter = 'PartitionWeight'")
@@ -503,11 +504,11 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
             #  if PartitionWeight doesn't exist, then insert the PartitionWeightType and
             #  PartitionWeight parameters.
             if not hasParam:
-                sql = ("INSERT INTO event_data (ship, survey, event_id, partition, event_parameter," +
+                sql = ("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, event_parameter," +
                         "parameter_value) VALUES (" + self.ship+ "," + self.survey + "," + self.activeHaul +
                         ",'" + pnet_partition + "', 'PartitionWeightType','not_subsampled')")
                 self.db.dbExec(sql)
-                sql = ("INSERT INTO event_data (ship, survey, event_id, partition, event_parameter," +
+                sql = ("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, event_parameter," +
                         "parameter_value) VALUES (" + self.ship + "," + self.survey + "," +
                         self.activeHaul+ ",'" + pnet_partition + "','PartitionWeight','TBD')")
                 self.db.dbExec(sql)
@@ -515,17 +516,17 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  Methot and Bongo hauls are also never subsampled so we always set their
         #  PartitionWeightType to not_subsampled and PartitionWeight 'TBD'.
         if (self.gearType == 'PlanktonNet'):
-            sql = ("SELECT event_parameter FROM event_data WHERE ship=" + self.ship +
+            sql = ("SELECT event_parameter FROM " + self.schema + ".event_data WHERE ship=" + self.ship +
                     " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                     " AND event_parameter='PartitionWeightType'")
             query = self.db.dbQuery(sql)
             hasParam, = query.first()
             if not hasParam:
-                sql = ("INSERT INTO event_data (ship, survey, event_id, partition, event_parameter," +
+                sql = ("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, event_parameter," +
                         "parameter_value) VALUES (" + self.ship+ "," + self.survey + "," +
                         self.activeHaul + ",'Codend','PartitionWeightType','not_subsampled')")
                 self.db.dbExec(sql)
-                sql = ("INSERT INTO event_data (ship, survey, event_id, partition, event_parameter," +
+                sql = ("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, event_parameter," +
                         "parameter_value) VALUES (" + self.ship+ "," + self.survey + "," +
                         self.activeHaul + ",'Codend','PartitionWeight','TBD')")
                 self.db.dbExec(sql)
@@ -534,7 +535,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  the event performance code in the database
         if self.perfBoxFlag:
             perfCode = self.performanceCodes[self.perfBox.currentIndex()]
-            sql = ("UPDATE events SET performance_code="+perfCode+ " WHERE ship=" + self.ship+
+            sql = ("UPDATE " + self.schema + ".events SET performance_code="+perfCode+ " WHERE ship=" + self.ship+
                     " AND survey=" + self.survey+ " AND event_id = " + self.activeHaul)
             self.db.dbExec(sql)
 
@@ -567,7 +568,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         if not self.perfCheckBox.isChecked():
             #  get the short list
             sql = ("SELECT event_performance.performance_code, event_performance.description " +
-                    "FROM event_performance INNER JOIN gear_options ON event_performance.performance_code" +
+                    "FROM " + self.schema + ".event_performance INNER JOIN " + self.schema + ".gear_options ON event_performance.performance_code" +
                     "= gear_options.performance_code WHERE (((gear_options.gear)='" +
                     self.gearLabel.text() + "')) ORDER BY gear_options.perf_gui_order")
             query = self.db.dbQuery(sql)
@@ -585,7 +586,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
             self.performanceCodes = []
 
             sql = ("SELECT event_performance.performance_code, event_performance.description " +
-                    "FROM event_performance")
+                    "FROM " + self.schema + ".event_performance")
             query = self.db.dbQuery(sql)
             for perfCode, description in query:
                 self.perfBox.addItem(description)
@@ -620,7 +621,7 @@ class CLAMSHaul(QDialog, ui_CLAMSHaul.Ui_clamsHaul):
         #  if the user clicked "OK" when closing, update the database
         if keyDialog.okFlag:
             self.comment = keyDialog.dispEdit.toPlainText()
-            sql = ("UPDATE events SET comments='" + self.comment + "' WHERE ship=" +
+            sql = ("UPDATE " + self.schema + ".events SET comments='" + self.comment + "' WHERE ship=" +
                     self.ship + " AND survey=" + self.survey+ " AND event_id = " +
                     self.activeHaul)
             self.db.dbExec(sql)

@@ -40,7 +40,7 @@ from PyQt6.QtCore import *
 
 class BarcodeNumeric(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the

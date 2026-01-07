@@ -17,6 +17,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
         self.setupUi(self)
         #self.setAttribute(Qt.WA_DeleteOnClose)
         self.db=parent.db
+        self.schema=parent.schema
         self.db.dbOpen()
         self.workStation=parent.workStation
         self.survey=parent.survey
@@ -41,7 +42,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
 
         # populate species window
         sql = ("SELECT species.common_name,species.scientific_name,samples.species_code," +
-                "samples.sample_id,  samples.subcategory FROM species, samples, baskets "+
+                "samples.sample_id,  samples.subcategory FROM " + self.schema + "species, samples, baskets "+
                 "WHERE species.species_code = samples.species_code AND samples.ship = baskets.ship "+
                 "AND samples.event_id = baskets.event_id AND samples.survey = baskets.survey "+
                 "AND samples.sample_id = baskets.sample_id AND samples.ship = "+self.ship+" AND samples.survey="+
@@ -216,7 +217,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
     def populateFilters(self):
         if self.scientistBox.currentIndex() ==-1:
             self.scientistBox.clear()
-            sql = ("SELECT scientist FROM V_SPECIMEN_MEASUREMENTS WHERE " +
+            sql = ("SELECT scientist FROM " + self.schema + ".V_SPECIMEN_MEASUREMENTS WHERE " +
                                 " ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY scientist ORDER BY scientist")
             query = self.db.dbQuery(sql)
@@ -226,7 +227,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
 
         if self.workstationBox.currentIndex() ==-1:
             self.workstationBox.clear()
-            sql = ("SELECT workstation_ID FROM V_SPECIMEN_MEASUREMENTS WHERE " +
+            sql = ("SELECT workstation_ID FROM " + self.schema + ".V_SPECIMEN_MEASUREMENTS WHERE " +
                                 " ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY workstation_ID ORDER BY workstation_ID")
             query = self.db.dbQuery(sql)
@@ -236,7 +237,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
 
         if self.speciesBox.currentIndex() ==-1:
             self.speciesBox.clear()
-            sql = ("SELECT species_code, common_name, subcategory, sample_id FROM V_SPECIMEN_MEASUREMENTS WHERE " +
+            sql = ("SELECT species_code, common_name, subcategory, sample_id FROM " + self.schema + ".V_SPECIMEN_MEASUREMENTS WHERE " +
                                 " ship=" + self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                                 " AND partition='" + self.activePartition + "' "+self.filterString+" GROUP BY species_code, common_name, subcategory, sample_id ORDER BY species_code")
             query = self.db.dbQuery(sql)
@@ -270,13 +271,13 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
                     return
 
                 for specimen_id in range(int(self.startIDLabel.text()), int(self.endIDLabel.text())+1):
-                    sql = ("SELECT * FROM specimen WHERE specimen_id = "+ str(specimen_id)+
+                    sql = ("SELECT * FROM " + self.schema + ".specimen WHERE specimen_id = "+ str(specimen_id)+
                             " AND ship=" + self.ship +" AND survey=" + self.survey + " AND event_id=" +
                             self.activeHaul+" AND workstation_id="+self.workstationBox.currentText())
 
                     query = self.db.dbQuery(sql)
                     if query.first():# valid chioce of specimen
-                        sql = ("UPDATE specimen SET sample_id =" + newSampleKey+
+                        sql = ("UPDATE " + self.schema + ".specimen SET sample_id =" + newSampleKey+
                                 " WHERE specimen_id = "+ str(specimen_id)+" AND ship=" + self.ship +
                                 " AND survey=" + self.survey + " AND event_id=" + self.activeHaul+
                                 " AND workstation_id="+self.workstationBox.currentText())
@@ -285,7 +286,7 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
                         query = self.db.dbQuery(sql)
 
 
-                        sql = ("UPDATE measurements SET sample_id =" + newSampleKey+
+                        sql = ("UPDATE " + self.schema + ".measurements SET sample_id =" + newSampleKey+
                                 " WHERE specimen_id = "+ str(specimen_id)+" AND ship=" + self.ship +
                                 " AND survey=" + self.survey + " AND event_id=" + self.activeHaul)
                         query = self.db.dbQuery(sql)
@@ -336,14 +337,14 @@ class CLAMSSpeciesFix(QDialog, ui_CLAMSSpeciesFix.Ui_clamsSpeciesFix):
                 #  work through the series of specimen identified by the start and end values
                 for specimen_id in range(int(self.startIDLabel.text()), int(self.endIDLabel.text())+1):
                     #  filter the ID's by workstation
-                    sql = ("SELECT specimen_id FROM specimen WHERE specimen_id = "+ str(specimen_id)+
+                    sql = ("SELECT specimen_id FROM " + self.schema + ".specimen WHERE specimen_id = "+ str(specimen_id)+
                             " AND ship=" + self.ship +" AND survey=" + self.survey +  " AND event_id=" +
                             self.activeHaul+" AND workstation_id="+self.workstationBox.currentText())
                     query = self.db.dbQuery(sql)
 
                     if query.first():
                         #  this specimen is one that needs to change - change the sex to the specified value
-                        sql = ("UPDATE measurements set measurement_value = '" +
+                        sql = ("UPDATE " + self.schema + ".measurements set measurement_value = '" +
                                 newSex+"' where specimen_id = "+ str(specimen_id)+" AND ship=" +
                                 self.ship +" AND survey=" + self.survey +" AND event_id=" + self.activeHaul +
                                 " AND measurement_type = 'sex'")

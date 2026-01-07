@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260\CLAMS\ui\CLAMSProcess.ui'
+# Form implementation generated from reading ui file 'CLAMSProcess.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -85,6 +85,18 @@ class Ui_clamsProcess(object):
         self.partitionBox.setObjectName("partitionBox")
         self.verticalLayout_2.addWidget(self.partitionBox)
         self.horizontalLayout_3.addLayout(self.verticalLayout_2)
+        self.swfscCatchBtn = QtWidgets.QPushButton(parent=clamsProcess)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.swfscCatchBtn.sizePolicy().hasHeightForWidth())
+        self.swfscCatchBtn.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(16)
+        self.swfscCatchBtn.setFont(font)
+        self.swfscCatchBtn.setObjectName("swfscCatchBtn")
+        self.horizontalLayout_3.addWidget(self.swfscCatchBtn)
         self.catchBtn = QtWidgets.QPushButton(parent=clamsProcess)
         self.catchBtn.setEnabled(False)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
@@ -196,9 +208,20 @@ class Ui_clamsProcess(object):
         self.label.setText(_translate("clamsProcess", "Event"))
         self.haulBtn.setText(_translate("clamsProcess", "Haul Form"))
         self.label_2.setText(_translate("clamsProcess", "Partiton"))
+        self.swfscCatchBtn.setText(_translate("clamsProcess", "Catch"))
         self.catchBtn.setText(_translate("clamsProcess", "Catch Form"))
         self.lengthBtn.setText(_translate("clamsProcess", "Length Form"))
         self.specBtn.setText(_translate("clamsProcess", "Specimen Form"))
         self.fixSpeciesBtn.setText(_translate("clamsProcess", "Fix Species/Sex Assignment"))
         self.editCodendStateBtn.setText(_translate("clamsProcess", "Edit Codend State"))
         self.doneBtn.setText(_translate("clamsProcess", "Finished processing haul"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    clamsProcess = QtWidgets.QDialog()
+    ui = Ui_clamsProcess()
+    ui.setupUi(clamsProcess)
+    clamsProcess.show()
+    sys.exit(app.exec())

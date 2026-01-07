@@ -14,28 +14,20 @@
 #  DOCUMENTATION; OR (2) TO PROVIDE TECHNICAL SUPPORT TO USERS.
 
 """
-.. module:: CLAMScatch
+.. module:: sortedCatch
 
-    :synopsis: CLAMScatch presents the CLAMS catch form. The catch form
-               is used  to specify what was caught in the catch, as well
-               as if/how it will be further processed. The catch module
-               is used when the catch is sorted and weighed.
+    :synopsis: small CPS hauls with < 5 baskets entered here. 
+                Sorted Catch is also entered once a larger catch has been processed 
+                and sorted, then information is entered here. 
 
-| Developed by:  Rick Towler   <rick.towler@noaa.gov>
-|                Kresimir Williams   <kresimir.williams@noaa.gov>
+| Developed by:  Melina Shak <melina.shak@noaa.gov>
 | National Oceanic and Atmospheric Administration (NOAA)
 | National Marine Fisheries Service (NMFS)
-| Alaska Fisheries Science Center (AFSC)
-| Midwater Assesment and Conservation Engineering Group (MACE)
 |
 | Author:
-|       Rick Towler   <rick.towler@noaa.gov>
-|       Kresimir Williams   <kresimir.williams@noaa.gov>
+|       Melina Shak <melina.shak@noaa.gov>
 | Maintained by:
-|       Rick Towler   <rick.towler@noaa.gov>
-|       Kresimir Williams   <kresimir.williams@noaa.gov>
-|       Mike Levine   <mike.levine@noaa.gov>
-|       Nathan Lauffenburger   <nathan.lauffenburger@noaa.gov>
+|       Melina Shak <melina.shak@noaa.gov>
 """
 
 #  imports
@@ -45,7 +37,7 @@ from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
 from PyQt6.QtMultimedia import QSoundEffect
 from ui import ui_CLAMSCatch
-import addcatchspcdlg
+import CPS.cpsAddCatchSpcDlg as cpsAddCatchSpcDlg
 import numpad
 import typeseldialog
 import basketeditdlg
@@ -58,12 +50,12 @@ import FEATZebraPrinter
 import measurementDialogs.FEATProjectDlg as project
 
 
-class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
+class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
     def __init__(self, parent=None):
 
         #  call superclass init methods and GUI form setup method
-        super(CLAMSCatch, self).__init__(parent)
+        super(sortedCatch, self).__init__(parent)
         self.setupUi(self)
 
         #  copy some info from parent for convenience
@@ -90,13 +82,13 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.activeFullName = None
         self.samplePicture = None
         self.comment = ''
-        self.validList = [1, 1, 1]# sets valid sample type choices
+        self.validList = [1, 1]# sets valid sample type choices
+        self.basketTypes = ['Measure', 'Toss']
         self.freeze = False
         self.whHaulFlag = False
         self.devices = {}
         self.sounds = {}
         self.speciesProtos = {}
-        self.basketTypes = []
         self.subcategories = []
         self.manualDevice ='0'
         self.parentSamples = {}
@@ -153,7 +145,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.numpad = numpad.NumPad(self)
         self.addspec = addspecdlg.addspecedlg(self)
         self.typeDlg = typeseldialog.TypeSelDialog(self)
-        self.spcDlg = addcatchspcdlg.AddCatchSpcDlg(self)
+        
 
         #  connect signals and slots
         self.addspcBtn.clicked.connect(self.getSpecies)
@@ -168,7 +160,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.transBtn.clicked.connect(self.transferSample)
         self.commentBtn.setDisabled(True)  # initially disabled
         self.commentBtn.clicked.connect(self.getComment)
-        self.spcDlg.changed.connect(self.addSpecies)
+        
 
         #  connect the SensorMonitor SerialDataReceived signal to the
         #  getAuto method which processes input from devices.
@@ -211,89 +203,19 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             query = self.db.dbQuery(sql)
             pwt, = query.first()
             if not pwt:
-                #  there isn't a partition weight type for this partition so
-                #  we can't go on.
-                self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
-                        "You need to visit haul form before you can enter codend catch.",'info')
-                self.message.exec()
-                self.close()
-                return
-
-        # get sample types
-        sql = ("SELECT gear_options.basket_type FROM " + self.schema + ".gear_options INNER JOIN " +
-                self.schema + ".events ON gear_options.gear=events.gear WHERE events.ship=" + self.ship+
-                " AND events.survey=" + self.survey + " AND events.event_id=" + self.activeHaul+
-                " AND gear_options.basket_type is not NULL ORDER BY gear_options.basket_type")
-        query = self.db.dbQuery(sql)
-        for basketType, in query:
-            self.basketTypes.append(basketType)
-
-        #  set up the basket summary table based on the basket types available for this gear
-        self.sumTable.clearContents()
-        self.sumTable.setRowCount(len(self.basketTypes))
-        for i, bType in enumerate(self.basketTypes):
-            headerItem = QTableWidgetItem(bType)
-            headerItem.setFont(self.headerFont)
-            self.sumTable.setVerticalHeaderItem(i, headerItem)
-
-        #  check if this is a plankton trawl  - they're handled a bit differently
-        sql = ("SELECT GEAR.GEAR_TYPE FROM " + self.schema + ".events, " + self.schema + ".GEAR WHERE (events.GEAR = "+
-                "GEAR.GEAR ) and  ((events.SHIP = "+self.ship+" ) AND (events.SURVEY = "+
-                self.survey+" ) AND (events.event_id = "+self.activeHaul+"))")
-        query = self.db.dbQuery(sql)
-        gearType, = query.first()
-        if gearType == 'PlanktonNet':
-            self.planktonFlag = True
-
-        #  Check if we have a label printer attached at this workstation. If so,
-        #  create the printer object and if not, disable the print button
-        sql = ("SELECT MEASUREMENT_SETUP.DEVICE_ID, DEVICES.DEVICE_NAME " +
-                "FROM " + self.schema + ".MEASUREMENT_SETUP INNER JOIN  " + self.schema + ".DEVICES ON " +
-                "MEASUREMENT_SETUP.DEVICE_ID = DEVICES.DEVICE_ID WHERE " +
-                "MEASUREMENT_SETUP.WORKSTATION_ID = " +  self.workStation +
-                " AND DEVICES.DEVICE_NAME = 'Label_Printer'" +
-                " GROUP BY MEASUREMENT_SETUP.DEVICE_ID, DEVICES.DEVICE_NAME")
-        query = self.db.dbQuery(sql)
-        printerId, printerName = query.first()
-        if printerId:
-            #  initialize the Label Printer
-            if 'nwfsc' in self.settings['OrganizationName'].lower() or \
-                    'swfsc' in self.settings['OrganizationName'].lower():
-                # get the ip and port
-                printer_sql = ("SELECT device_parameter, parameter_value "
-                               "FROM " + self.schema + ".device_configuration WHERE device_id = " + printerId)
-                print_query = self.db.dbQuery(printer_sql)
-                ip = None
-                port = None
-                for param, val in print_query:
-                    if param.lower() == 'networkaddress':
-                        ip = val
-                    elif param.lower() == 'networkport':
-                        port = val
-                self.printer = FEATZebraPrinter.PrintLabel(self.ship, self.survey, ip, port)
-            else:
-                self.printer = ZebraLabelPrinter.ZebraLabelPrinter(self.sensorMonitor, printerName)
-        else:
-            #  no printer configured
-            self.printer = None
-            self.printBtn.setEnabled(False)
-        #  set up the printer sound.
-        sql = ("select a.parameter_value from " + self.schema + ".device_configuration a," +
-                self.schema + ".devices b where a.device_id=b.device_id " +
-                "and b.device_name='Label_Printer' and a.device_parameter='SoundFile'")
-        query = self.db.dbQuery(sql)
-        soundFile, = query.first()
-        if soundFile:
-            hasExt = soundFile.split('.')
-            if len(hasExt) > 1:
-                soundFile = self.settings['SoundsDir'] + soundFile
-            else:
-                soundFile = self.settings['SoundsDir'] + soundFile + '.wav'
-            soundEffect = QSoundEffect()
-            soundEffect.setSource(QUrl.fromLocalFile(soundFile))
-            self.printSound = soundEffect
-        else:
-            self.printSound = None
+                #  no partition weight so add one 
+                #  No partition intialized yet, insert a dummy one
+                sql = ("INSERT INTO " + self.schema + ".EVENT_DATA (ship, survey, event_id, partition, "
+                    "event_parameter, parameter_value) "
+                    "VALUES (" + self.ship + "," + self.survey + "," + self.activeHaul + ",'Codend',"
+                    "'PartitionWeightType','not_subsampled')")
+                self.db.dbExec(sql)
+                
+                sql = ("INSERT INTO " + self.schema + ".EVENT_DATA (ship, survey, event_id, partition, "
+                    "event_parameter, parameter_value) "
+                    "VALUES (" + self.ship + "," + self.survey + "," + self.activeHaul + ",'Codend',"
+                    "'PartitionWeight','TBD')")
+                self.db.dbExec(sql)
 
         #  setup parent sample. if not present, create whole catch sample which is
         #  the top level sample (no parent)
@@ -301,77 +223,39 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 self.survey+" AND event_id="+self.activeHaul+" AND partition ='"+self.activePartition+
                 "' AND species_code=100001")
         query = self.db.dbQuery(sql)
-        sampleID, = query.first()
-        if not sampleID:
+        self.parentSamples, = query.first()
+        if not self.parentSamples:
             #  the parent sample doesn't exist yet, so create it.
-            sql = ("INSERT INTO " + self.schema + ".samples (ship, survey, event_id, partition, " +
+            # Get parent sample_id (species_code = 1)
+            sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship="+self.ship+" AND survey="+
+                self.survey+" AND event_id="+self.activeHaul+" AND partition ='"+self.activePartition+
+                "' AND species_code=1")
+            query = self.db.dbQuery(sql)
+            parentId, = query.first()
+
+            if parentId is None:
+                sql = ("INSERT INTO " + self.schema + ".samples (ship, survey, event_id, partition, " +
                     "sample_type,species_code, scientist) VALUES("+self.ship+","+self.survey+
                     ","+self.activeHaul+ ",'"+self.activePartition+"','SortingTable',100001,'"
                     +self.scientist+"')")
-            self.db.dbExec(sql)
+                self.db.dbExec(sql)
+            else:
+                sql = ("INSERT INTO " + self.schema + ".samples (ship, survey, event_id, partition, " +
+                        "sample_type,species_code, scientist, parent_sample) VALUES("+self.ship+","+self.survey+
+                        ","+self.activeHaul+ ",'"+self.activePartition+"','SortingTable',100001,'"
+                        +self.scientist+"',"+ parentId+")")
+                self.db.dbExec(sql)
 
             #  now retrieve newly created sample ID from database
             sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeHaul+
                     " AND partition ='"+self.activePartition+"' AND species_code=100001")
             query = self.db.dbQuery(sql)
-            sampleID, = query.first()
+            self.parentSamples, = query.first()
 
-        self.sortingTableKey = sampleID
-
-        # is this a splitter?  if so create whole haul parent key
-        sql = ("SELECT event_data.PARAMETER_VALUE FROM " + self.schema + ".event_data  WHERE " +
-                "(event_data.SHIP="+self.ship+") AND (event_data.SURVEY="+self.survey+
-                ") AND (event_data.event_id="+self.activeHaul+") AND "+
-                "(event_data.PARTITION='"+self.activePartition+"') AND "+
-                "(event_data.event_parameter='PartitionWeightType')")
-
-        query = self.db.dbQuery(sql)
-        partitionWeightType, = query.first()
-
-        if partitionWeightType:
-            if partitionWeightType.lower() != 'not_subsampled':
-                #  this is a splitter - check if we have the whole haul
-                #  sample and if not, create it.
-                sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship="+self.ship+
-                        " AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                        " AND partition ='"+self.activePartition+"' AND species_code=100000")
-                query = self.db.dbQuery(sql)
-                wholeHaulID, = query.first()
-
-                if not wholeHaulID:
-                    #  we don't already have this sample id- first catch has been run
-                    #  for this event.
-                    sql = ("INSERT INTO " + self.schema + ".samples (ship, survey, event_id, partition, " +
-                            " sample_type, species_code,scientist) VALUES("+self.ship+","+self.survey+
-                            ","+self.activeHaul+",'"+self.activePartition+"'"+
-                            ",'WholeHaul',100000, '"+self.scientist+"')")
-                    self.db.dbExec(sql)
-
-                    # retrieve newly created sample key from database
-                    sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship="+self.ship+
-                            " AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                            " AND partition ='"+self.activePartition+"' AND species_code=100000")
-
-                    query = self.db.dbQuery(sql)
-                    wholeHaulID, = query.first()
-
-                self.wholeHaulKey = wholeHaulID
-
-                # update parent key for 'sorting table' sample
-                sql = ("UPDATE " + self.schema + ".samples SET parent_sample="+self.wholeHaulKey+" WHERE ship="+self.ship+
-                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                    " AND partition ='"+self.activePartition+"' AND species_code=100001")
-                self.db.dbExec(sql)
-
-                # set the wholeHaul flag since this is a splitter
-                self.whHaulFlag=True
-            else:
-                #  catch not subsampled - unset wholeHaul flag
-                self.whHaulFlag=False
-        else:
-            #  If we don't have a partition weight type, then we're not subsampling
-            self.whHaulFlag=False
+        self.spcDlg = cpsAddCatchSpcDlg.cpsAddCatchSpcDlg(self)
+        self.spcDlg.changed.connect(self.addSpecies)
+        self.sortingTableKey = self.parentSamples
 
         #  get the list of possible subcategories
         sql = ("SELECT subcategory FROM " + self.schema + ".species_subcategories")
@@ -386,7 +270,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.reloadSamplesList()
 
 
-        self.updateParentKeys()
+        #self.updateParentKeys()
 
 
     def getSpecies(self):
@@ -414,13 +298,15 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         spcName = self.spcDlg.activeSpcName
         subCat = self.spcDlg.activeSpcSubcat
         sampleType = self.spcDlg.activeSampleType
+        isSubMix = self.spcDlg.isSubMix
 
         # parent sample
-        parentKey  = self.parentSamples[self.spcDlg.parentSample]
-        self.createSample(code, spcName, subCat,  self.spcDlg.nameType,  parentKey, sampleType)
+        #parentKey  = self.parentSamples[self.spcDlg.parentSample]
+        
+        self.createSample(code, spcName, subCat,  self.spcDlg.nameType,  self.parentSamples, sampleType, isSubMix)
 
         #
-        self.updateParentKeys()
+        #self.updateParentKeys()
 
         # make this new addition the active one...
         self.reloadSamplesList()
@@ -454,7 +340,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.parentSamples.update({'SortingTable':self.sortingTableKey})
 
 
-    def createSample(self, code, name, subCat, nameType, parentSample, sampleType):
+    def createSample(self, code, name, subCat, nameType, parentSample, sampleType, isSubMix):
 
         #  check if the species that we're being told to add is already in
         #  out list of samples.
@@ -466,6 +352,15 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             if self.speciesList.findItems(name, Qt.MatchFlag.MatchExactly):
                 #  species is already in the list - just return
                 return
+            
+        # Get parentId of submix and add count to basket types
+        if isSubMix:
+            sql = ("select sample_id from samples where survey=" + self.survey + 
+               " AND event_id=" + self.activeHaul + 
+               " AND parent_sample=" + self.parentSamples + 
+               " AND sample_type='SubMix'")
+            query = self.db.dbQuery(sql)
+            parentSample, = query.first()
 
         #  insert this data into the samples table
         sql = ("INSERT INTO " + self.schema + ".samples (ship,survey,event_id,partition,sample_type," +
@@ -707,7 +602,11 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         if self.settings['EnablePresentSampleType'] in ['1', 'true', 'True']:
             self.setActiveSampleType(self.activeSampleType)
 
-        # look for previous data on species
+        # look for previous data on 
+        if parentSample == 'SubMix':
+            self.basketTypes = ['Measure', 'Toss', 'Count']
+        else:
+            self.basketTypes = ['Measure', 'Toss']
         self.updateTables()
         self.focus='speciesList'
 
@@ -883,12 +782,6 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         the basket is a measure, count, or toss basket.
 
         '''
-
-        #  first, if we're in a mix, disable the count button
-        if self.activeSpcCode in ['100002', '100003', '100004']:
-            self.validList[self.basketTypes.index('Count')] = 0
-        else:
-            self.validList[self.basketTypes.index('Count')] = 1
 
         #  display the basket type dialog
         self.typeDlg.buttonSetup(self.validList, self.basketTypes)
@@ -1543,7 +1436,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 "samples.ship="+self.ship+" AND samples.survey=" + self.survey +
                 " AND samples.event_id="+self.activeHaul+" AND samples.partition='"+
                 self.activePartition+"' AND samples.species_code NOT IN " +
-                "(100000,100001) ORDER BY samples.sample_id ASC")
+                "(1,100000,100001) ORDER BY samples.sample_id ASC")
         sampleQuery = self.db.dbQuery(sql)
         for sampleId, commonName, sciName, spCode, parentId, subcat, sample_type in sampleQuery:
             #  get the namespace - if the species is added using common name,
@@ -1579,17 +1472,14 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 name = species
 
             #  get the parent sample name
-            sql = ("SELECT b.common_name FROM " + self.schema + ".samples a JOIN " + self.schema + ".species b ON " +
-                    "a.species_code=b.species_code WHERE a.ship=" + self.ship +
-                    " AND a.survey=" + self.survey+" AND a.event_id=" +
-                    self.activeHaul + " AND a.sample_id=" + parentId)
-            parentQuery = self.db.dbQuery(sql)
-            parentName, = parentQuery.first()
-
-            if parentName:
-                myParent = parentName
-            else:
-                myParent = ''
+            myParent = ''
+            if parentId is not None:
+                sql = ("SELECT b.common_name FROM " + self.schema + ".samples a JOIN " + self.schema + ".species b ON " +
+                        "a.species_code=b.species_code WHERE a.ship=" + self.ship +
+                        " AND a.survey=" + self.survey+" AND a.event_id=" +
+                        self.activeHaul + " AND a.sample_id=" + parentId)
+                parentQuery = self.db.dbQuery(sql)
+                myParent, = parentQuery.first()
 
             #  get the total basket weights for this sample
             sql = ("SELECT SUM(weight) FROM " + self.schema + ".baskets WHERE ship=" + self.ship +

@@ -190,7 +190,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.resize(size)
 
         # set default sampling methods
-        sql = "SELECT sampling_method FROM sampling_methods"
+        sql = "SELECT sampling_method FROM " + self.schema + ".sampling_methods"
         query = self.db.dbQuery(sql)
         for sampling_method,  in query:
             self.samplingMethodBox.addItem(sampling_method)
@@ -315,8 +315,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         samples = []
         subCats = []
         self.speciesDict = {}
-        sql = ("SELECT species.common_name, species.scientific_name, samples.species_code, samples.sample_id, samples.subcategory FROM" +
-                " species, samples, baskets WHERE species.species_code = samples.species_code" +
+        sql = ("SELECT species.common_name, species.scientific_name, samples.species_code, samples.sample_id, samples.subcategory FROM " +
+                self.schema + ".species, " + 
+                self.schema + ".samples, " + 
+                self.schema + ".baskets WHERE species.species_code = samples.species_code" +
                 " AND samples.ship=baskets.ship AND samples.survey=baskets.survey AND " +
                 "samples.event_id=baskets.event_id AND samples.sample_id=baskets.sample_id AND samples.ship=" + self.ship +
                 " AND samples.survey=" + self.survey + " AND samples.event_id=" + self.activeHaul +
@@ -327,7 +329,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         for common_name, scientific_name, species_code, sample_id, subcategory in query:
 
             # check to see if the sample has a specified scientific or common name
-            sql0 = ("SELECT PARAMETER_VALUE FROM sample_data WHERE sample_parameter='sample_name' AND ship="+
+            sql0 = ("SELECT PARAMETER_VALUE FROM " + self.schema + ".sample_data WHERE sample_parameter='sample_name' AND ship="+
                     self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+ " AND sample_id="+sample_id)
             query0 = self.db.dbQuery(sql0)
 
@@ -386,7 +388,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         nParms = len(params)
         vals = [None] * nParms
         for i in range(nParms):
-            sql = ("SELECT parameter_value FROM species_data WHERE species_code=" +
+            sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code=" +
                     self.activeSpcCode+" AND subcategory='" + self.activeSpcSubcat +
                     "' AND lower(species_parameter)='" + params[i] + "'")
             query = self.db.dbQuery(sql)
@@ -413,7 +415,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.lengthTypes.append(vals[1])
 
         #  determine the maturity table
-        sql = ("SELECT parameter_value FROM species_data WHERE species_code="+self.activeSpcCode+
+        sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code="+self.activeSpcCode+
                 " AND subcategory='"+self.activeSpcSubcat+"' AND lower(species_parameter)='maturity_table'")
         query = self.db.dbQuery(sql)
         parameter_value,  = query.first()
@@ -459,7 +461,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         #  build a list of the active protocols for this species
         self.protocols = []
         nProtocols = 0
-        sql = ("SELECT protocol_name FROM protocol_map WHERE species_code = " +
+        sql = ("SELECT protocol_name FROM " + self.schema + ".protocol_map WHERE species_code = " +
                 self.activeSpcCode + " AND subcategory= '"+self.activeSpcSubcat +"' AND active=1")
         query = self.db.dbQuery(sql)
         for protocol_name,  in query:
@@ -698,7 +700,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         missing_validations = []
         for valObj, valName in zip(self.validations[i], self.valNames[i]):
             # instantiate the validation object with the database credentials and the current species
-            valObj = valObj(self.db, self.activeSpcCode)
+            valObj = valObj(self.db, self.schema, self.activeSpcCode)
             # perform the validation
             result = valObj.validate(val, self.measureType, self.values)
             if not result[0] and not result[0] == None:
@@ -724,7 +726,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             update_missing_validations = False
             # check to see if we have a validation error already for this specimen
-            sql = ("SELECT description FROM overrides " +
+            sql = ("SELECT description FROM " + self.schema + ".overrides " +
                         "WHERE ship = " + self.ship + " AND survey = " + self.survey +
                         " AND table_name = 'validations'"
                         " AND record_id = "+ self.specimenKey)
@@ -745,14 +747,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             if update_missing_validations:
                 #  insert event into overrides table
-                sql = ("UPDATE overrides SET description = '" + missing_validation_text +
+                sql = ("UPDATE " + self.schema + ".overrides SET description = '" + missing_validation_text +
                         "' WHERE ship = " + self.ship + " AND survey = " + self.survey +
                         " AND table_name = 'validations'"
                         " AND record_id = "+ self.specimenKey)
                 self.db.dbExec(sql)
             else:
                 #  insert event into overrides table
-                sql = ("INSERT INTO overrides (ship,survey,event_id,record_id,table_name," +
+                sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                         "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                         "," + self.activeHaul + "," + self.specimenKey + ",'validations','" +
                         self.scientist + "','" + missing_validation_text + "')")
@@ -853,7 +855,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         missing_validations = []
         for valObj, valName in zip(self.validations[i], self.valNames[i]):
             # instantiate the validation object with the database credentials and the current species
-            valObj = valObj(self.db, self.activeSpcCode)
+            valObj = valObj(self.db, self.schema, self.activeSpcCode)
             # perform the validation
             result = valObj.validate(val, self.measureType, self.values)
             if not result[0] and not result[0] == None:
@@ -879,7 +881,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 self.getNewSpecimen()
             update_missing_validations = False
             # check to see if we have a validation error already for this specimen
-            sql = ("SELECT description FROM overrides " +
+            sql = ("SELECT description FROM " + self.schema + ".overrides " +
                         "WHERE ship = " + self.ship + " AND survey = " + self.survey +
                         " AND table_name = 'validations'"
                         " AND record_id = "+ self.specimenKey)
@@ -900,14 +902,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             if update_missing_validations:
                 #  insert event into overrides table
-                sql = ("UPDATE overrides SET description = '" + missing_validation_text +
+                sql = ("UPDATE " + self.schema + ".overrides SET description = '" + missing_validation_text +
                         "' WHERE ship = " + self.ship + " AND survey = " + self.survey +
                         " AND table_name = 'validations'"
                         " AND record_id = "+ self.specimenKey)
                 self.db.dbExec(sql)
             else:
                 #  insert event into overrides table
-                sql = ("INSERT INTO overrides (ship,survey,event_id,record_id,table_name," +
+                sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                         "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                         "," + self.activeHaul + "," + self.specimenKey + ",'validations','" +
                         self.scientist + "','" + missing_validation_text + "')")
@@ -961,7 +963,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         #  check if we're editing (overwriting) a record or inserting a new one
         if self.editFieldFlag:
             # overwrite record - UPDATE
-            sql =("UPDATE measurements SET measurement_value ='" + self.values[i] + "' WHERE  ship="+
+            sql =("UPDATE " + self.schema + ".measurements SET measurement_value ='" + self.values[i] + "' WHERE  ship="+
                     self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
                     " AND sample_id="+self.activeSample+" AND specimen_id = " +self.specimenKey +
                     " AND measurement_type = '" + measure_type+"'")
@@ -975,7 +977,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
         else:
             #  this is a new record - INSERT
-            sql = ("INSERT INTO measurements (ship, survey, event_id, sample_id, specimen_id, " +
+            sql = ("INSERT INTO " + self.schema + ".measurements (ship, survey, event_id, sample_id, specimen_id, " +
                     "measurement_type, device_id, measurement_value) VALUES (" +self.ship+","+
                     self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey +
                     ",'" + measure_type + "'," + device_id + ",'" + self.values[i] + "')")
@@ -1081,7 +1083,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                             ' measurements.')
 
                 #  insert event into overrides table
-                sql = ("INSERT INTO overrides (ship,survey,event_id,record_id,table_name," +
+                sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                         "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                         "," + self.activeHaul + "," + self.specimenKey + ",'measurements','" +
                         self.scientist + "','" + missing_measurements_text + "')")
@@ -1131,7 +1133,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             return
 
         #  insert the initial data into specimen
-        sql = ("INSERT INTO specimen (ship, survey, event_id, sample_id, workstation_id, scientist, " +
+        sql = ("INSERT INTO " + self.schema + ".specimen (ship, survey, event_id, sample_id, workstation_id, scientist, " +
                 " sampling_method, protocol_name, comments) VALUES (" +self.ship+","+self.survey+","+
                 self.activeHaul+ ","+self.activeSample+","+ self.workStation + ",'" + self.scientist +
                 "','" + samplingMethod + "','" + self.protocol + "','" + self.comment + "')")
@@ -1142,7 +1144,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.samplingMethodBox.setEnabled(False)
 
         # get the newly created specimen key
-        sql = ("SELECT max(specimen_id) FROM specimen WHERE ship="+self.ship+" AND survey="+self.survey+
+        sql = ("SELECT max(specimen_id) FROM " + self.schema + ".specimen WHERE ship="+self.ship+" AND survey="+self.survey+
                 " AND event_id="+self.activeHaul+ " AND sample_id="+self.activeSample+
                 " AND workstation_id=" + self.workStation)
         query = self.db.dbQuery(sql)
@@ -1179,7 +1181,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         #  set the model view SQL
         if self.admin:
             #  admin mode shows all measurements
-            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM V_SPECIMEN_MEASUREMENTS WHERE " +
+            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM " + self.schema + 
+                   ".V_SPECIMEN_MEASUREMENTS WHERE " +
                     "ship="+self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
                     " AND sample_id="+self.activeSample+"  AND " +
                     "PROTOCOL_NAME = '" + self.protocol +"'" + sqlStringEnd +
@@ -1187,7 +1190,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.measureModel.setQuery(sql, self.db.db)
         else:
             #  regular mode shows only measurements at that station
-            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM V_SPECIMEN_MEASUREMENTS WHERE " +
+            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM " + self.schema + 
+                   ".V_SPECIMEN_MEASUREMENTS WHERE " +
                   "ship="+self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
                   " AND sample_id="+self.activeSample+
                   " AND PROTOCOL_NAME = '" + self.protocol + "' AND WORKSTATION_ID = " +
@@ -1269,9 +1273,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         sql = ("SELECT PROTOCOL_DEFINITIONS.MEASUREMENT_TYPE, MEASUREMENT_SETUP.DEVICE_ID," +
                 "DEVICES.DEVICE_INTERFACE,PROTOCOL_DEFINITIONS.FORCE_MEASUREMENT," +
                 "PROTOCOL_DEFINITIONS.FORCE_ORDER,PROTOCOL_DEFINITIONS.LABEL " +
-                "FROM MEASUREMENT_SETUP JOIN PROTOCOL_DEFINITIONS " +
+                "FROM " + self.schema + ".MEASUREMENT_SETUP JOIN " + self.schema + ".PROTOCOL_DEFINITIONS " +
                 "ON PROTOCOL_DEFINITIONS.MEASUREMENT_TYPE=MEASUREMENT_SETUP.MEASUREMENT_TYPE " +
-                "JOIN DEVICES ON DEVICES.DEVICE_ID=MEASUREMENT_SETUP.DEVICE_ID " +
+                "JOIN " + self.schema + ".DEVICES ON DEVICES.DEVICE_ID=MEASUREMENT_SETUP.DEVICE_ID " +
                 "WHERE PROTOCOL_DEFINITIONS.PROTOCOL_NAME='"+self.protocol+"' AND " +
                 "MEASUREMENT_SETUP.WORKSTATION_ID="+self.workStation+" AND  " +
                 "MEASUREMENT_SETUP.GUI_MODULE='Specimen' " +
@@ -1317,7 +1321,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 self.label.append(label)
 
             # get the sounds for the device
-            sql = ("SELECT device_configuration.PARAMETER_VALUE FROM device_configuration WHERE " +
+            sql = ("SELECT device_configuration.PARAMETER_VALUE FROM " + self.schema + ".device_configuration WHERE " +
                     "(device_configuration.DEVICE_ID = "+device+") AND (" +
                     "device_configuration.DEVICE_PARAMETER = 'SoundFile' )")
             query1 = self.db.dbQuery(sql)
@@ -1339,7 +1343,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             # for software inputs, get the dialog to be used
             if interface.lower() == 'software':
-                sql1=("SELECT device_configuration.PARAMETER_VALUE FROM device_configuration WHERE " +
+                sql1=("SELECT device_configuration.PARAMETER_VALUE FROM " + self.schema + ".device_configuration WHERE " +
                         "(device_configuration.DEVICE_ID = " + device + " ) AND (" +
                         "device_configuration.DEVICE_PARAMETER = 'Module' )")
                 query1 = self.db.dbQuery(sql1)
@@ -1366,7 +1370,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                     thisDialog = None
 
                     #  get the device name for the error dialog
-                    sql1 = ("SELECT device_name FROM devices WHERE device_id=" +device)
+                    sql1 = ("SELECT device_name FROM " + self.schema + ".devices WHERE device_id=" +device)
                     query1 = self.db.dbQuery(sql1)
                     device_name, = query1.first()
                     if device_name:
@@ -1389,7 +1393,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 self.dialogs.append(thisDialog)
 
             # get validations
-            sql1 = ("SELECT VALIDATION FROM VALIDATIONS WHERE ( "+
+            sql1 = ("SELECT VALIDATION FROM " + self.schema + ".VALIDATIONS WHERE ( "+
                     "PROTOCOL_NAME = '"+self.protocol+"' ) AND ( "+
                     "MEASUREMENT_TYPE = '"+type+"') "+
                     "ORDER BY VALIDATION_ORDER ASC ")
@@ -1455,7 +1459,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.samplingMethodBox.setCurrentIndex(self.samplingMethodBox.findText('random'))
 
         # get conditionals
-        sql = ("SELECT CONDITIONALS.CONDITIONAL FROM CONDITIONALS WHERE ( "+
+        sql = ("SELECT CONDITIONALS.CONDITIONAL FROM " + self.schema + ".CONDITIONALS WHERE ( "+
                 "CONDITIONALS.PROTOCOL_NAME = '"+self.protocol+"')")
         query = self.db.dbQuery(sql)
         self.conditionals = []
@@ -1521,10 +1525,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                                 " specimen " + self.specimenKey + ", " + self.firstName + "? ", 'choice')
         if self.message.exec():
             #  yes - delete the specimen
-            sql = ("DELETE FROM measurements WHERE ship="+self.ship+
+            sql = ("DELETE FROM " + self.schema + ".measurements WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = " + self.specimenKey)
             self.db.dbExec(sql)
-            sql = ("DELETE FROM specimen WHERE ship="+self.ship+
+            sql = ("DELETE FROM " + self.schema + ".specimen WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+self.specimenKey)
             self.db.dbExec(sql)
 
@@ -1618,7 +1622,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.values = [None] * len(self.measureType)
 
         #  query the measurements for this specimen
-        sql = ("SELECT measurement_type, measurement_value FROM measurements WHERE ship=" +
+        sql = ("SELECT measurement_type, measurement_value FROM " + self.schema + ".measurements WHERE ship=" +
                 self.ship+ " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = " +
                 self.specimenKey)
         query = self.db.dbQuery(sql)
@@ -1650,7 +1654,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.values[ind] = value
 
         # set the random flag and get the comments
-        sql = ("SELECT sampling_method, comments FROM specimen WHERE ship="+
+        sql = ("SELECT sampling_method, comments FROM " + self.schema + ".specimen WHERE ship="+
                 self.ship+ " AND survey="+self.survey+" AND event_id="+self.activeHaul+
                 " AND specimen_id = "+self.specimenKey)
         query = self.db.dbQuery(sql)
@@ -1662,7 +1666,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
         # get any comments
         self.comment = ''
-        sql = ("SELECT comments FROM specimen WHERE specimen_id = "+self.specimenKey+" AND ship="+self.ship+
+        sql = ("SELECT comments FROM " + self.schema + ".specimen WHERE specimen_id = "+self.specimenKey+" AND ship="+self.ship+
         " AND survey="+self.survey+" AND event_id="+self.activeHaul)
         query = self.db.dbQuery(sql)
         val, = query.first()
@@ -1709,7 +1713,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                         self.printLabel()
                     else:
                         # insert measurement
-                        sql=("INSERT INTO measurements (ship,survey,event_id,sample_id,specimen_id," +
+                        sql=("INSERT INTO " + self.schema + ".measurements (ship,survey,event_id,sample_id,specimen_id," +
                                 "measurement_type,device_id,measurement_value) VALUES ("+self.ship+","+
                                 self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey + ",'" +
                                 self.collectionMeasurementTypes[i] + "'," + self.collectionDevices[i] + ",'Yes')")
@@ -1761,7 +1765,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         else:
             #  get data from db - query everything *BUT* length
             sql = ("SELECT ship, survey, event_id, specimen_id, species_code, common_name, "+
-                    "organism_weight, sex, maturity, scientist, barcode FROM v_specimen_measurements WHERE "+
+                    "organism_weight, sex, maturity, scientist, barcode FROM " + self.schema + ".v_specimen_measurements WHERE "+
                     "survey=" + self.survey +" AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
             query = self.db.dbQuery(sql)
             data = query.first()
@@ -1794,7 +1798,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             if self.lengthTypeBox.isEnabled():
                 lengthType = str(self.lengthTypeBox.currentText())
 
-                sql = ("SELECT lower(measurement_type), measurement_value from measurements WHERE " +
+                sql = ("SELECT lower(measurement_type), measurement_value from " + self.schema + ".measurements WHERE " +
                     "measurement_type = '"+lengthType+"' AND survey=" + self.survey +
                     " AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
                 query = self.db.dbQuery(sql)
@@ -1815,7 +1819,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 for lengthType in self.measureType:
                     if lengthType in len_list:
                         lengthType = str(lengthType)
-                        sql = ("SELECT lower(measurement_type), measurement_value from measurements WHERE " +
+                        sql = ("SELECT lower(measurement_type), measurement_value from " + self.schema + ".measurements WHERE " +
                             "measurement_type = '"+lengthType+"' AND survey=" + self.survey +
                             " AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
                         query = self.db.dbQuery(sql)
@@ -1879,7 +1883,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                     newString = newString + c + ' '
 
                 # insert comment into sample
-                sql =("UPDATE specimen SET comments='" + newString +
+                sql =("UPDATE " + self.schema + ".specimen SET comments='" + newString +
                         "' WHERE ship="+self.ship+ " AND survey="+self.survey+" AND event_id="+self.activeHaul+
                         " AND specimen_id = " + self.specimenKey)
                 self.db.dbExec(sql)
@@ -1891,7 +1895,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
     def editSamplingMethod(self):
         # user toggles in sample flag - have to update data
         if self.editStateFlag:
-            sql = ("UPDATE specimen SET sampling_method ='" + self.samplingMethodBox.currentText() +
+            sql = ("UPDATE " + self.schema + ".specimen SET sampling_method ='" + self.samplingMethodBox.currentText() +
                     "' WHERE ship="+self.ship+ " AND survey="+self.survey+" AND event_id="+self.activeHaul+
                     " AND specimen_id = "+self.specimenKey)
             self.db.dbExec(sql)

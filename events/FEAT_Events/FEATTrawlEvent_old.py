@@ -158,7 +158,7 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
             elif self.lw_events.currentItem().text().contains("Current"):
                 # check to see if samples exist
                 temp_event = self.lw_events.currentItem().text().split("\t")[0]
-                query = self.db.dbQuery("SELECT * FROM Samples WHERE event_id = " + str(temp_event))
+                query = self.db.dbQuery("SELECT * FROM " + self.schema + ". Samples WHERE event_id = " + str(temp_event))
                 if query.first():
                     self.pb_edit.setEnabled(False)
                 else:
@@ -291,16 +291,16 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
                 # if not update the event_data table
                 try:
                     self.db.dbQuery("ALTER TABLE Event_Data disable constraint EVENTS_EVENT_DATA_FK")
-                    self.db.dbQuery("UPDATE Event_Data SET event_id = " + str(value) + " WHERE event_id = "
+                    self.db.dbQuery("UPDATE " + self.schema + ".Event_Data SET event_id = " + str(value) + " WHERE event_id = "
                                     + str(temp_event))
                     self.db.dbQuery("ALTER TABLE Event_Data enable constraint EVENTS_EVENT_DATA_FK")
                     # update the event table
                     try:
-                        self.db.dbQuery("UPDATE Events SET event_id = " + str(value) + " WHERE event_id = "
+                        self.db.dbQuery("UPDATE " + self.schema + ".Events SET event_id = " + str(value) + " WHERE event_id = "
                                         + str(temp_event))
                         # update the application_configuration table
                         try:
-                            self.db.dbQuery("UPDATE Application_Configuration SET parameter_value = " + str(value) +
+                            self.db.dbQuery("UPDATE " + self.schema + ".Application_Configuration SET parameter_value = " + str(value) +
                                             "WHERE parameter = 'ActiveEvent'")
                             self.activeEvent = value
                             self.set_cur_event()
@@ -390,19 +390,19 @@ class AddParams(QDialog, ui_FEATEventParams.Ui_Dialog):
         :return:
         """
         # get gear list
-        gear_sql = "SELECT gear FROM GEAR WHERE active=1"
+        gear_sql = "SELECT gear FROM " + self.schema + ".GEAR WHERE active=1"
         gear_query = self.db.dbQuery(gear_sql)
         for gear, in gear_query:
             self.cb_gear.addItem(gear)
 
         # get event_types
-        e_sql = "SELECT description FROM EVENT_TYPES"
+        e_sql = "SELECT description FROM " + self.schema + ".EVENT_TYPES"
         e_query = self.db.dbQuery(e_sql)
         for description, in e_query:
             self.cb_event_type.addItem(description)
 
         # get scientists
-        scis = self.db.dbQuery("SELECT scientist FROM PERSONNEL WHERE active=1")
+        scis = self.db.dbQuery("SELECT scientist FROM " + self.schema + ".PERSONNEL WHERE active=1")
         for sci, in scis:
             self.cb_sci.addItem(sci)
 
@@ -415,7 +415,7 @@ class AddParams(QDialog, ui_FEATEventParams.Ui_Dialog):
         self.sci = self.cb_sci.currentText()
         desc = self.cb_event_type.currentText()
         # get event_type_id
-        ev_sql = ("SELECT event_type FROM EVENT_TYPES where description = '" + desc + "'")
+        ev_sql = ("SELECT event_type FROM " + self.schema + ".EVENT_TYPES where description = '" + desc + "'")
         ev_query = self.db.dbQuery(ev_sql)
         self.event_type, = ev_query.first()
         self.accept()

@@ -25,6 +25,7 @@ class ExtendedSampleCollectionDlg(QDialog, ui_ExtendedSampleCollection.Ui_extend
         # variable declarations
         # from the passed parent
         self.db = parent.db
+        self.schema = parent.schema
         self.survey = parent.survey
         self.ship = parent.ship
         self.activeHaul = parent.activeHaul
@@ -56,7 +57,7 @@ class ExtendedSampleCollectionDlg(QDialog, ui_ExtendedSampleCollection.Ui_extend
         """
         # get buttons out of database
         query = QSqlQuery("SELECT ex_sample_code, button_text, active "
-                          "FROM extended_sample_collections"
+                          "FROM " + self.schema + ".extended_sample_collections"
                           "WHERE active = 1 "
                           "ORDER BY ex_sample_code")
 
@@ -74,7 +75,7 @@ class ExtendedSampleCollectionDlg(QDialog, ui_ExtendedSampleCollection.Ui_extend
 
         # check to see if there's already something in the DB to check the button
         if self.specimenKey:
-            query = QSqlQuery("Select measurement_value FROM measurements WHERE  ship=" + self.ship +
+            query = QSqlQuery("Select measurement_value FROM " + self.schema + ".measurements WHERE  ship=" + self.ship +
                               " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                               " AND sample_id=" + self.activeSample + " AND specimen_id = " + self.specimenKey +
                               " AND measurement_type = 'ex_sample_collections'")
@@ -115,7 +116,7 @@ class ExtendedSampleCollectionDlg(QDialog, ui_ExtendedSampleCollection.Ui_extend
         self.label = []
         self.code = []
         query = QSqlQuery("SELECT ex_sample_code, button_text, active "
-                          "FROM extended_sample_collections "
+                          "FROM " + self.schema + ".extended_sample_collections "
                           "WHERE active = 1 ORDER BY ex_sample_code")
         while query.next():
             self.code.append(query.value(0).toString())

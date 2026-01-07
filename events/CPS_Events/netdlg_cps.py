@@ -87,11 +87,11 @@ class NetDlgCPS(QDialog, ui_NetDlg_CPS.Ui_netDlg):
         if cur_time:
             self.cur_time = cur_time
 
-            sql = ("SELECT measurement_type, measurement_value FROM EVENT_STREAM_DATA WHERE" +
+            sql = ("SELECT measurement_type, measurement_value FROM " + self.schema + ".EVENT_STREAM_DATA WHERE" +
                 " SHIP=" + self.ship + 
                 " and survey=" + self.survey +
                 " and event_id=" + self.activeEvent +
-                " and time_stamp=to_timestamp('" + self.cur_time + "', 'MMDDYYYY HH24:MI:SS.FF3')" +
+                " and time_stamp=" + self.db.createTimeStamp(self.cur_time) + 
                 " and measurement_type in ('DoorSpread', 'Footrope')")
             query = self.db.dbQuery(sql)
             for val in query:
@@ -132,8 +132,7 @@ class NetDlgCPS(QDialog, ui_NetDlg_CPS.Ui_netDlg):
                 sql = ("SELECT * FROM " + self.schema + ".event_stream_data WHERE" + 
                        " event_id=" + self.activeEvent + 
                        " AND measurement_type='" + key + 
-                       "' AND time_stamp=to_timestamp('" + self.cur_time + 
-                       "', 'MMDDYYYY HH24:MI:SS.FF3')")
+                       "' AND time_stamp=" + self.db.createTimeStamp(self.cur_time))
                 query = self.db.dbQuery(sql)
                 val = query.first()
                 if val[0] != None and len(val) > 0:
@@ -141,15 +140,15 @@ class NetDlgCPS(QDialog, ui_NetDlg_CPS.Ui_netDlg):
                            " SET measurement_value=" + self.values[key] +
                            " WHERE event_id=" + self.activeEvent + 
                            " AND measurement_type='" + key +
-                           "' AND time_stamp=to_timestamp('" + self.cur_time + "', 'MMDDYYYY HH24:MI:SS.FF3')")
+                           "' AND time_stamp=" + self.db.createTimeStamp(self.cur_time))
                     self.db.dbExec(sql)
                 else:
                     # Enter data into event_stream_data table
                     sql = ("INSERT INTO " + self.schema + ".event_stream_data (ship,survey, " +
                                             "event_id, device_id, time_stamp, measurement_type, measurement_value) " +
                                             "VALUES (" + self.ship + ", " + self.survey + ", " + self.activeEvent +
-                                            ", 3, to_timestamp('" + self.cur_time + "', 'MMDDYYYY HH24:MI:SS.FF3'), '" +
-                                            key + "', '" + self.values[key] +"')")
+                                            ", 3, " + self.db.createTimeStamp(self.cur_time) +
+                                            ", '" + key + "', '" + self.values[key] +"')")
                     self.db.dbExec(sql)
         self.close()
 

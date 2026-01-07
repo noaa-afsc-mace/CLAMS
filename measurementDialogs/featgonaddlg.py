@@ -81,6 +81,7 @@ class FEATNadDlg(QDialog, ui_FEATGonadDlg.Ui_Dialog):
         self.printer_connected = parent.printer_connected
         self.printer = parent.printer
         self.db = parent.db
+        self.schema = parent.schema
         # disable buttons
         self.pb_done.setEnabled(False)
 
@@ -113,7 +114,7 @@ class FEATNadDlg(QDialog, ui_FEATGonadDlg.Ui_Dialog):
         """
         rtn = False
         if self.specimen_key is not None:
-            exist_sql = "SELECT * FROM Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
+            exist_sql = "SELECT * FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
                         " AND event_id=" + self.active_event + " AND sample_id=" + self.active_sample + \
                         " AND specimen_id=" + self.specimen_key + " AND measurement_type='barcode'"
             exist_query = self.db.dbQuery(exist_sql)
@@ -129,7 +130,7 @@ class FEATNadDlg(QDialog, ui_FEATGonadDlg.Ui_Dialog):
         """
         measures_to_load = ['gonad_collect', 'gonad_weight']
         for measure in measures_to_load:
-            query_txt = "SELECT measurement_value FROM Measurements WHERE measurement_type = '%s' " \
+            query_txt = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE measurement_type = '%s' " \
                         "AND specimen_id = %s" % (measure, self.specimen_key)
             query = self.db.dbQuery(query_txt)
             if query.first():
@@ -243,7 +244,7 @@ class GetLabel(QDialog):
         """
         # create the barcode
         # get the last five of the otolith
-        sql = "SELECT measurement_value FROM Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
+        sql = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + " AND survey=" + self.survey + \
               " AND event_id=" + self.active_event + " AND sample_id=" + self.active_sample + \
               " AND specimen_id=" + self.specimen_key + " AND measurement_type = 'barcode'"
         query = self.db.dbQuery(sql)
@@ -255,7 +256,7 @@ class GetLabel(QDialog):
         project = "FEAT Gonad Collection"
 
         # get the ship name
-        query_txt = "SELECT name FROM Ships WHERE ship=" + self.ship
+        query_txt = "SELECT name FROM " + self.schema + ".Ships WHERE ship=" + self.ship
         query = self.db.dbQuery(query_txt)
         query.first()
         ship_name = query.value(0).toString()

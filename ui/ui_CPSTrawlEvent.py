@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\Users\Melina.Shak\Documents\CLAMS_WPy64-31260_Deploy\CLAMS\ui\CPSTrawlEvent.ui'
+# Form implementation generated from reading ui file 'CPSTrawlEvent.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -288,7 +288,7 @@ class Ui_CPSTrawlEvent(object):
         self.dataTable.setAlternatingRowColors(True)
         self.dataTable.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.dataTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self.dataTable.setColumnCount(5)
+        self.dataTable.setColumnCount(4)
         self.dataTable.setObjectName("dataTable")
         self.dataTable.setRowCount(6)
         item = QtWidgets.QTableWidgetItem()
@@ -311,8 +311,6 @@ class Ui_CPSTrawlEvent(object):
         self.dataTable.setHorizontalHeaderItem(2, item)
         item = QtWidgets.QTableWidgetItem()
         self.dataTable.setHorizontalHeaderItem(3, item)
-        item = QtWidgets.QTableWidgetItem()
-        self.dataTable.setHorizontalHeaderItem(4, item)
         self.dataTable.horizontalHeader().setCascadingSectionResizes(True)
         self.dataTable.horizontalHeader().setDefaultSectionSize(125)
         self.dataTable.horizontalHeader().setMinimumSectionSize(100)
@@ -433,9 +431,17 @@ class Ui_CPSTrawlEvent(object):
         item.setText(_translate("CPSTrawlEvent", "Latitude"))
         item = self.dataTable.horizontalHeaderItem(3)
         item.setText(_translate("CPSTrawlEvent", "Longitude"))
-        item = self.dataTable.horizontalHeaderItem(4)
-        item.setText(_translate("CPSTrawlEvent", "Bottom Depth"))
         self.label_42.setText(_translate("CPSTrawlEvent", "Time since NIW"))
         self.commentBtn.setText(_translate("CPSTrawlEvent", "Overall\n"
 "Comment"))
         self.doneBtn.setText(_translate("CPSTrawlEvent", "Done"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    CPSTrawlEvent = QtWidgets.QDialog()
+    ui = Ui_CPSTrawlEvent()
+    ui.setupUi(CPSTrawlEvent)
+    CPSTrawlEvent.show()
+    sys.exit(app.exec())

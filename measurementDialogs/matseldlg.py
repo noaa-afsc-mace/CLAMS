@@ -53,6 +53,7 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
         super(MatSelDlg, self).__init__(parent)
         self.setupUi(self)
         self.db = parent.db
+        self.schema = parent.schema
         self.settings = parent.settings
         self.speciesName = parent.activeSpcName
         self.activeSpcCode = parent.activeSpcCode
@@ -66,7 +67,7 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
         self.oto_present = True
 
         # get maturity stage names
-        mat_stage_sql = "SELECT parameter_value FROM species_data " \
+        mat_stage_sql = "SELECT parameter_value FROM " + self.schema + ".species_data " \
                         "WHERE lower(species_parameter)='maturity_table' AND species_code=" + self.activeSpcCode
         query = self.db.dbQuery(mat_stage_sql)
         mat_stage_query, = query.first()
@@ -74,7 +75,7 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
             return
 
         mat_desc_sql = "SELECT md.button_text, md.description_text_female " \
-                       "FROM maturity_description md JOIN maturity_tables mt " \
+                       "FROM  " + self.schema + ".maturity_description md JOIN  " + self.schema + ".maturity_tables mt " \
                        "ON (mt.maturity_table = md.maturity_table) WHERE " \
                        "(mt.maturity_table = " + mat_stage_query + ")"
         query = self.db.dbQuery(mat_desc_sql)

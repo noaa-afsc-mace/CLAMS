@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>450</width>
-    <height>400</height>
+    <height>448</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -15,6 +15,11 @@
     <width>450</width>
     <height>400</height>
    </size>
+  </property>
+  <property name="font">
+   <font>
+    <family>Arial</family>
+   </font>
   </property>
   <property name="windowTitle">
    <string>Finish Tow</string>
@@ -129,6 +134,9 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="avgVals"/>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">

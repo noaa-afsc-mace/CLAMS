@@ -66,6 +66,7 @@ class SWFSCFinClipDNADlg(QDialog, ui_SWFSCFinClipDNADlg.Ui_SWFSCFinClipDNADlg):
 
         #  copy the bits we need
         self.db = parent.db
+        self.schema = parent.schema
         self.survey=parent.survey
         self.ship=parent.ship
         self.numpad = parent.numpad
@@ -113,7 +114,7 @@ class SWFSCFinClipDNADlg(QDialog, ui_SWFSCFinClipDNADlg.Ui_SWFSCFinClipDNADlg):
         '''
         #  first, query the last vial number and generate the next one in the
         #  series.
-        sql = ("SELECT measurement_value FROM measurements WHERE ship=" + self.ship +
+        sql = ("SELECT measurement_value FROM " + self.schema + ".measurements WHERE ship=" + self.ship +
                 " AND survey=" + self.survey + " AND measurement_type='dna_finclip_number' " +
                 "AND measurement_value <> 'None' ORDER BY measurement_value DESC")
         query = self.db.dbQuery(sql)
@@ -137,7 +138,7 @@ class SWFSCFinClipDNADlg(QDialog, ui_SWFSCFinClipDNADlg.Ui_SWFSCFinClipDNADlg):
         '''
 
         #  get the vessel code
-        sql = ("SELECT vessel_code FROM ships WHERE ship=" + self.ship)
+        sql = ("SELECT vessel_code FROM " + self.schema + ".ships WHERE ship=" + self.ship)
         query = self.db.dbQuery(sql)
         vesselCode, = query.first()
 

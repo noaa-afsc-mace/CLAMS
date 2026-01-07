@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class WeightRange(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -62,7 +62,7 @@ class WeightRange(QObject):
         QObject.__init__(self, None)
 
         #  Get the valid weight range for this species from the species_data table
-        sql = ("SELECT parameter_value FROM species_data WHERE species_code=" + speciesCode +
+        sql = ("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code=" + speciesCode +
                " AND subcategory='" + subcategory + "' AND lower(species_parameter)='min_weight'")
         query = db.dbQuery(sql)
         minWeight, = query.first()
@@ -71,7 +71,7 @@ class WeightRange(QObject):
         else:
             self.minWeight = 0
 
-        sql=("SELECT parameter_value FROM species_data WHERE species_code=" + speciesCode +
+        sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code=" + speciesCode +
              " AND subcategory='" + subcategory + "' AND lower(species_parameter)='max_weight'")
         query = db.dbQuery(sql)
         maxWeight, = query.first()

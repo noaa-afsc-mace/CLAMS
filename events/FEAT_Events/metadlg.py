@@ -139,14 +139,14 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
         :return:
         """
         # list of scientists for the fisher
-        sci_sql = "SELECT scientist FROM personnel WHERE active=1 AND uuid='F'"
+        sci_sql = "SELECT scientist FROM " + self.schema + ".personnel WHERE active=1 AND uuid='F'"
         sci_query = self.db.dbQuery(sci_sql)
         for sci, in sci_query:
             self.cb_sci.addItem(sci)
             self.cb_sci.setCurrentIndex(-1)
 
         # list of gear
-        gear_sql = "SELECT gear FROM gear WHERE active=1"
+        gear_sql = "SELECT gear FROM " + self.schema + ".gear WHERE active=1"
         gear_query = self.db.dbQuery(gear_sql)
         for gear, in gear_query:
             self.cb_gear.addItem(gear)
@@ -154,7 +154,7 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
 
         # TODO: update this from db 2025 offseason
         # list of tom weights
-        tom_sql = ("SELECT gear_accessory_option FROM gear_accessory_options "
+        tom_sql = ("SELECT gear_accessory_option FROM " + self.schema + ".gear_accessory_options "
                    "WHERE gear_accessory = 'TomWeights' AND active = 1")
         tom_query = self.db.dbQuery(tom_sql)
         for tom, in tom_query:
@@ -162,7 +162,7 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
             self.cb_toms.setCurrentIndex(-1)
 
         # list of net numbers
-        net_sql = ("SELECT gear_accessory_option FROM gear_accessory_options "
+        net_sql = ("SELECT gear_accessory_option FROM " + self.schema + ".gear_accessory_options "
                    "WHERE gear_accessory='NetNumber' AND active = 1")
         net_query = self.db.dbQuery(net_sql)
         for net, in net_query:
@@ -170,7 +170,7 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
             self.cb_netnums.setCurrentIndex(-1)
 
         # SBE lists
-        sbe_sql = ("SELECT gear_accessory_option FROM gear_accessory_options "
+        sbe_sql = ("SELECT gear_accessory_option FROM " + self.schema + ".gear_accessory_options "
                    "WHERE gear_accessory = 'SBE_serial' AND active = 1")
         sbe_query = self.db.dbQuery(sbe_sql)
         for sbe, in sbe_query:
@@ -185,9 +185,9 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
             self.cb_cam_sbe.setCurrentIndex(-1)
 
         # camera type and view
-        cam_t_sql = ("SELECT gear_accessory_option FROM gear_accessory_options "
+        cam_t_sql = ("SELECT gear_accessory_option FROM " + self.schema + ".gear_accessory_options "
                      "WHERE gear_accessory = 'CameraType' AND active = 1")
-        cam_v_sql = ("SELECT gear_accessory_option FROM gear_accessory_options "
+        cam_v_sql = ("SELECT gear_accessory_option FROM " + self.schema + ".gear_accessory_options "
                      "WHERE gear_accessory = 'CameraView' AND active = 1")
         cam_t_query = self.db.dbQuery(cam_t_sql)
         cam_v_query = self.db.dbQuery(cam_v_sql)

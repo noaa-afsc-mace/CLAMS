@@ -79,15 +79,15 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
         #  the table.
         if catchOnly:
             sql = ("SELECT a.performance_code, a.event_id, a.gear FROM (SELECT performance_code, event_id, gear, " +
-                    "ship, survey FROM events) a JOIN (SELECT gear, gear_type " +
-                    "FROM gear) b ON a.gear = b.gear JOIN (SELECT gear_type, " +
-                    "retains_catch from gear_types) c ON b.gear_type = c.gear_type " +
+                    "ship, survey FROM " + self.schema + ".events) a JOIN (SELECT gear, gear_type " +
+                    "FROM " + self.schema + ".gear) b ON a.gear = b.gear JOIN (SELECT gear_type, " +
+                    "retains_catch from  " + self.schema + ".gear_types) c ON b.gear_type = c.gear_type " +
                     "WHERE a.ship = " + parent.ship + " AND a.survey= " + parent.survey +
                     " AND c.retains_catch > 0  ORDER BY event_id ASC")
         else:
             sql = ("SELECT a.performance_code, a.event_id, a.gear FROM (SELECT performance_code, event_id, gear, " +
-                    "ship, survey FROM events) a JOIN (SELECT gear, gear_type " +
-                    "FROM gear) b ON a.gear = b.gear WHERE a.ship = " + parent.ship +
+                    "ship, survey FROM " + self.schema + ".events) a JOIN (SELECT gear, gear_type " +
+                    "FROM " + self.schema + ".gear) b ON a.gear = b.gear WHERE a.ship = " + parent.ship +
                     " AND a.survey= " + parent.survey + " ORDER BY event_id ASC")
         eventQuery = self.db.dbQuery(sql)
 
@@ -100,7 +100,7 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
 
             if catchOnly:
                 #  check if the event is "closed" defined by having a HB time
-                sql = ("SELECT parameter_value FROM event_data WHERE event_parameter IN ('Haulback', 'HB')" +
+                sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE event_parameter IN ('Haulback', 'HB')" +
                        " AND event_id=" + event_id + " AND ship=" + parent.ship +
                        " AND survey=" + parent.survey)
                 query = self.db.dbQuery(sql)
@@ -123,7 +123,7 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
             else:
                 #  For non catch events, "closed" is harder to define. We'll say if EQ, Timestamp,
                 #  or Released exist in the event_data table we'll call the event closed.
-                sql = ("SELECT parameter_value FROM event_data WHERE (event_parameter='EQ'" +
+                sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE (event_parameter='EQ'" +
                         " OR event_parameter = 'TimeStamp' OR event_parameter = 'Released') "
                         " AND event_id=" + event_id + " AND ship=" + parent.ship +
                         " AND survey=" + parent.survey)
@@ -162,7 +162,7 @@ class EventSelDlg(QDialog, ui_EventSelDlg.Ui_eventselDlg):
 
         '''
         #  get the last event ID
-        sql = ("SELECT MAX(event_id) FROM events WHERE survey ="+
+        sql = ("SELECT MAX(event_id) FROM " + self.schema + ".events WHERE survey ="+
                 self.survey + " and ship= " + self.ship)
         query = self.db.dbQuery(sql)
         lastEvent, = query.first()

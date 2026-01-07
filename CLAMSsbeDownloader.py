@@ -261,7 +261,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             return
 
         #  get the latitude of this event - first we try to get it from the event_data table
-        query = self.db.dbQuery("SELECT parameter_value FROM event_data WHERE ship = " + self.settings['ActiveShip'] +
+        query = self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship = " + self.settings['ActiveShip'] +
                 " and survey =" + self.settings['ActiveSurvey'] + " and event_id =" + event +
                 " and event_parameter = 'EQLatitude'")
         eqLatitude, = query.first()
@@ -579,7 +579,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         try:
             #  determine if this data has already been downloaded
-            sql = ("SELECT event_parameter FROM event_data WHERE ship=" + self.shipLabel.text() +
+            sql = ("SELECT event_parameter FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() +
                     " AND survey=" + self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() +
                     " AND event_parameter like '%SBE' AND parameter_value='" + self.serialNumber + "'")
             mountingLocQuery = self.db.dbQuery(sql)
@@ -595,22 +595,22 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
                     avgDepthParam, avgTempParam = self.getAveragesParamNames(mountingLoc)
 
                     #  now we can clear out old data
-                    sql = ("DELETE FROM event_stream_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
+                    sql = ("DELETE FROM " + self.schema + ".event_stream_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
                             self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND device_id=" +
                             self.device_id)
                     self.db.dbExec(sql)
                     #  and clear out the old average data as well
-                    sql = ("DELETE FROM event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
+                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
                             self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
                             "event_parameter='" + avgDepthParam + "'")
                     self.db.dbExec(sql)
-                    sql = ("DELETE FROM event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
+                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
                             self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
                             "event_parameter='" + avgTempParam + "'")
                     self.db.dbExec(sql)
 
                     #  and lastly, clear out the mounting location
-                    sql = ("DELETE FROM event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
+                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
                             self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
                             "event_parameter like '%SBE' AND parameter_value='" + self.serialNumber + "'")
                     self.db.dbExec(sql)
@@ -620,7 +620,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
                     return
 
             #  insert the SBE mounting location into haul_data
-            self.db.dbQuery("INSERT INTO event_data (ship,  survey, event_id, partition, " +
+            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship,  survey, event_id, partition, " +
                 "event_parameter,  parameter_value) VALUES("+ self.shipLabel.text() +
                 "," + self.surveyLabel.text() + ","+self.haulLabel.text() + ",'Codend','" +
                 self.sbeLocation + "','"+ self.serialNumber +"')")
@@ -738,21 +738,21 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         avgDepth = float('nan')
 
         # Find EQ time
-        query=self.db.dbQuery("SELECT parameter_value FROM event_data WHERE ship=" +
+        query=self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
                               ship + " AND survey=" + survey + " AND event_id= " +
                               haul + " AND partition='" + p+
                               "' AND event_parameter = 'EQ'")
         eqTime=query.first()
 
         # Find HB time
-        query=self.db.dbQuery("SELECT parameter_value FROM event_data WHERE ship=" +
+        query=self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
                               ship + " AND survey=" + survey + " AND event_id= " +
                               haul + " AND partition='" + p+
                               "' AND event_parameter = 'Haulback'")
         hbTime=query.first()
 
         # Find temperature data between EQ & HB and average
-        query=self.db.dbQuery("Select measurement_value FROM event_stream_data WHERE"+
+        query=self.db.dbQuery("Select measurement_value FROM " + self.schema + ".event_stream_data WHERE"+
                         " time_stamp between to_timestamp('"+eqTime[0]+"','MMDDYYYY HH24:MI:SS.FF3')" +
                         " and to_timestamp('"+hbTime[0]+"','MMDDYYYY HH24:MI:SS:FF3') AND " +
                         " device_id=" + self.device_id + " AND measurement_type='SBETemperature'")
@@ -768,7 +768,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
                 avgTemp = cumVal / nVals
 
         # Find depth data between EQ & HB and average
-        query=self.db.dbQuery("Select measurement_value FROM event_stream_data WHERE"+
+        query=self.db.dbQuery("Select measurement_value FROM " + self.schema + ".event_stream_data WHERE"+
                         " time_stamp between to_timestamp('"+eqTime[0]+"','MMDDYYYY HH24:MI:SS.FF3')" +
                         " and to_timestamp('"+hbTime[0]+"','MMDDYYYY HH24:MI:SS:FF3') AND " +
                         " device_id=" + self.device_id + " AND measurement_type='SBEDepth'")
@@ -784,11 +784,11 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         # Insert averages into event_data table
         if not math.isnan(avgTemp):
-            self.db.dbQuery("INSERT INTO event_data (ship, survey, event_id, partition, " +
+            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, " +
                     "event_parameter, parameter_value) VALUES("+ ship+","+survey+","+haul+",'"+
                     p+"','" + avgTempParam + "',"+str(avgTemp)+")")
 
-            self.db.dbQuery("INSERT INTO event_data (ship, survey, event_id, partition, " +
+            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, " +
                     "event_parameter, parameter_value) VALUES("+ship+","+survey+","+haul+",'"+
                     p+"','" + avgDepthParam + "',"+str(avgDepth)+")")
         else:

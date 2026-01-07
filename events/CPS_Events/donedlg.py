@@ -63,6 +63,10 @@ class DoneDlg(QDialog, ui_DoneDlg.Ui_doneDlg):
         self.cur_coms = ""
 
         self.message = messagedlg.MessageDlg(self)
+        self.cb_perf.setCurrentIndex(0)
+
+        # list to hold performance codes
+        perfVal = []
 
         # set up performance box
         # fill the performance dialog
@@ -70,7 +74,12 @@ class DoneDlg(QDialog, ui_DoneDlg.Ui_doneDlg):
         perf_sql = ("SELECT event_performance.performance_code, event_performance.description "
                     "FROM " + self.schema + ".event_performance ORDER BY event_performance.performance_code DESC")
         perf_query = self.db.dbQuery(perf_sql)
-        i = 0
+
+        # init reason options and set current reason
+        for perfCode, desc in perf_query:
+            perf_txt = str(perfCode) + " - " + desc
+            self.cb_perf.addItem(perf_txt)
+            perfVal.append(perfCode)
 
         # get overall comments and performance code from db to display
         query = ("SELECT performance_code, comments FROM " + self.schema + ".events WHERE ship=" +
@@ -81,21 +90,38 @@ class DoneDlg(QDialog, ui_DoneDlg.Ui_doneDlg):
         # set comment to db comment
         self.te_comment.setText(val[1])
 
-        # init reason
-        self.cb_perf.setCurrentIndex(-1)
+        # set cb_perf index
+        if val[0] is not None:
+            # find index of performance code
+            index = perfVal.index(val[0])
+            self.cb_perf.setCurrentIndex(index)
         
-        # init reason options and set current reason
-        for perfCode, desc in perf_query:
-            perf_txt = str(perfCode) + " - " + desc
-            self.cb_perf.addItem(perf_txt)
-            if val[0] == perfCode:
-                self.cb_perf.setCurrentIndex(i)
-            i += 1
+        # get average values from events_data table
+        if (hasattr(parent, 'avgLabels') and len(parent.avgLabels) > 0):
+            formattAvgLabels = ", ".join([f"'{x}'" for x in parent.avgLabels])
+            avgQuery = ("SELECT event_parameter, parameter_value FROM " + self.schema +
+                        ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey + 
+                        " AND event_id=" + self.activeEvent +
+                        " AND event_parameter in (" + formattAvgLabels + ") ")
+            avg_query = self.db.dbQuery(avgQuery)
+
+            # display average values
+            row = 0
+            for val in avg_query:
+                label = QLabel("<b>" + val[0] + ':</b>')
+                label.setMinimumHeight(20)
+                self.avgVals.addWidget(label, row, 0)
+
+                value = QLabel(val[1])
+                value.setMinimumHeight(20)
+                self.avgVals.addWidget(value, row, 1)
+                row+=1
 
         # set signals and slots
         self.te_comment.selectionChanged.connect(self.display_keypad)
         self.pb_done.clicked.connect(self.save)
         self.pb_cancel.clicked.connect(self.cancel)
+        self.ckb_man.hide()
 
     def display_keypad(self):
         """

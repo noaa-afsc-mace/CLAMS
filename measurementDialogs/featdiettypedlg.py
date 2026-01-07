@@ -86,6 +86,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         self.printer_connected = parent.printer_connected
         self.printer = parent.printer
         self.db = parent.db
+        self.schema = parent.schema
         self.called_enable = self.settings['called_enable']
         # self.called_enable = False
         self.settings = {}
@@ -156,7 +157,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         if not self.edit_flag:
             # check collected and called numbers
             # get total already collected and called
-            collection_sql = "SELECT COUNT(*) FROM Measurements WHERE event_id = " + self.active_event + \
+            collection_sql = "SELECT COUNT(*) FROM " + self.schema + ".Measurements WHERE event_id = " + self.active_event + \
                              " AND measurement_type = 'stomach_collect'"\
                              " AND measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')"
             collection_query = self.db.dbQuery(collection_sql)
@@ -167,7 +168,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
                 self.tw_stom_type.setTabEnabled(0, False)
 
             # get total already collected and called
-            called_sql = "SELECT COUNT(*) FROM Measurements WHERE event_id = " + self.active_event + \
+            called_sql = "SELECT COUNT(*) FROM " + self.schema + ".Measurements WHERE event_id = " + self.active_event + \
                          " AND measurement_type = 'stom_cont_1" \
                          " AND measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')"
             called_query = self.db.dbQuery(called_sql)
@@ -219,7 +220,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         """
         self.oto_present = False
         if self.specimen_key is not None:
-            exist_sql = "SELECT measurement_value FROM Measurements WHERE ship=" + self.ship + \
+            exist_sql = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + \
                         " AND survey=" + self.survey + " AND event_id=" + self.active_event + \
                         " AND sample_id=" + self.active_sample + " AND specimen_id=" + self.specimen_key + \
                         " AND measurement_type = 'barcode'"
@@ -240,7 +241,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         measures_to_load = ['stomach_collect', 'stom_cont_1', 'stom_cont_2', 'stom_cont_3',
                             'stom_vol_1', 'stom_vol_2', 'stom_vol_3', 'stom_overall_wt']
         for measure in measures_to_load:
-            query_txt = "SELECT measurement_value FROM Measurements WHERE measurement_type = '%s' " \
+            query_txt = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE measurement_type = '%s' " \
                         "AND specimen_id = %s" % (measure, self.specimen_key)
             query = self.db.dbQuery(query_txt)
             if query.first():
@@ -298,7 +299,7 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         returns the species name for the code
         :return: species name - scientific
         """
-        query_txt = "SELECT scientific_name FROM Species WHERE species_code = " + sp_code
+        query_txt = "SELECT scientific_name FROM " + self.schema + ".Species WHERE species_code = " + sp_code
         query = self.db.dbQuery(query_txt)
         query.first()
         return query.value(0).toString()
@@ -678,32 +679,32 @@ class GetStomachSpecies(QDialog, ui_FEATDietSpDlg.Ui_Dialog):
         if self.r_com.isChecked():
             # if chars are empty, return full list of species in Species_Data that are stomach_species
             if self.chars == '':
-                com_query = "SELECT species.common_name FROM species WHERE species_code IN " \
-                            "(SELECT species_code FROM Species_Data WHERE species_parameter = 'stomach_species' " \
+                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code IN " \
+                            "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' " \
                             "AND parameter_value = 1) ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM species WHERE species_code IN " \
-                            "(SELECT species_code FROM Species_Data WHERE species_parameter = 'stomach_species' " \
+                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code IN " \
+                            "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' " \
                             "AND parameter_value = 1) ORDER BY species.scientific_name"
             else:
-                com_query = ("SELECT species.common_name FROM species WHERE species_code IN "
-                             "(SELECT species_code FROM Species_Data WHERE species_parameter = 'stomach_species' "
+                com_query = ("SELECT species.common_name FROM " + self.schema + ".species WHERE species_code IN "
+                             "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' "
                              "AND parameter_value = 1) AND upper(species.common_name)" +
                              "LIKE upper('%" + self.chars + "%') ORDER BY species.common_name")
-                sci_query = ("SELECT species.scientific_name FROM species WHERE species_code IN "
-                             "(SELECT species_code FROM Species_Data WHERE species_parameter = 'stomach_species' "
+                sci_query = ("SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code IN "
+                             "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' "
                              "AND parameter_value = 1) AND upper(species.scientific_name) " +
                              "('%" + self.chars + "%') ORDER BY species.scientific_name")
         else:
             if self.chars == '':
-                com_query = "SELECT species.common_name FROM species WHERE species_code != -1 " \
+                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code != -1 " \
                             "ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM species WHERE species_code != -1 " \
+                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code != -1 " \
                             "ORDER BY species.scientific_name"
             else:
-                com_query = "SELECT species.common_name FROM species WHERE species_code != -1 AND "\
+                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code != -1 AND "\
                             "upper(species.common_name) LIKE upper('%" + self.chars + \
                             "%') ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM species WHERE species_code != -1 AND " \
+                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code != -1 AND " \
                             "upper(species.scientific_name) LIKE upper('%" + self.chars + \
                             "%') ORDER BY species.scientific_name"
         query = self.db.dbQuery(com_query)
@@ -759,10 +760,10 @@ class GetStomachSpecies(QDialog, ui_FEATDietSpDlg.Ui_Dialog):
         list_origin = self.sender()
         active_name = list_origin.currentItem().text()
         if self.nameTab.currentIndex() == 0:
-            sql = "SELECT species_code FROM species WHERE common_name='" + active_name + "'"
+            sql = "SELECT species_code FROM " + self.schema + ".species WHERE common_name='" + active_name + "'"
             query = self.db.dbQuery(sql)
         else:
-            sql = "SELECT species_code FROM species WHERE scientific_name='" + active_name + "'"
+            sql = "SELECT species_code FROM " + self.schema + ".species WHERE scientific_name='" + active_name + "'"
             query = self.db.dbQuery(sql)
         query.first()
         sp_code = query.value(0).toString()

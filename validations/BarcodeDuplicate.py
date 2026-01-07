@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class BarcodeDuplicate(QObject):
 
-    def __init__(self, db, speciesCode, subcategory='None'):
+    def __init__(self, db, schema, speciesCode, subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -62,6 +62,7 @@ class BarcodeDuplicate(QObject):
 
         #  store validation parameters
         self.db = db
+        self.schema = schema
         self.speciesCode = speciesCode
         self.subcategory = subcategory
 
@@ -96,7 +97,7 @@ class BarcodeDuplicate(QObject):
         '''
 
         #  see if this barcode exists for any survey in the database.
-        sql = ("SELECT device_id FROM measurements WHERE measurement_type in" +
+        sql = ("SELECT device_id FROM "+ self.schema + ".measurements WHERE measurement_type in" +
                 "('barcode', 'alpha_barcode') AND measurement_value ='" + currentValue + "'")
         query = self.db.dbQuery(sql)
         isbarCode,  = query.first()

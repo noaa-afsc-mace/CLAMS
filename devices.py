@@ -67,7 +67,7 @@ def getSoftwareDevices(db, workstationID):
     return devices
 
 
-def getDevices(db, workstationID, softwareOnly=False, hardwareOnly=False):
+def getDevices(db, workstationID, schema, softwareOnly=False, hardwareOnly=False):
     '''getDevices returns a dictionary, keyed by device name
     containing the device ID and device interface for serial or network
     based devices connected to the specified workstation.
@@ -84,12 +84,12 @@ def getDevices(db, workstationID, softwareOnly=False, hardwareOnly=False):
                 "('scs','network','serial') ")
 
     #  query the devices attached to this station
-    sql = ("SELECT measurement_setup.device_id,devices.device_name," +
-            "devices.device_interface,measurement_setup.measurement_type," +
-            "measurement_setup.gui_module FROM measurement_setup INNER JOIN DEVICES ON " +
-            "measurement_setup.device_id=devices.device_id WHERE " +
-            "measurement_setup.workstation_id=" +  workstationID +
-            " AND devices.active=1 " + whereMod)
+    sql = ("SELECT m.device_id,d.device_name," +
+            "d.device_interface,m.measurement_type," +
+            "m.gui_module FROM " + schema + ".measurement_setup m INNER JOIN " + schema + ".DEVICES d ON " +
+            "m.device_id=d.device_id WHERE " +
+            "m.workstation_id=" +  workstationID +
+            " AND d.active=1 " + whereMod)
     devQuery = db.dbQuery(sql)
     for deviceID, deviceName, deviceInterface, measurementType, guiModule in devQuery:
         if deviceName not in devices:
@@ -104,12 +104,12 @@ def getDevices(db, workstationID, softwareOnly=False, hardwareOnly=False):
     return devices
 
 
-def getDeviceParameters(db, deviceName, deviceID, deviceInterface):
+def getDeviceParameters(db, schema, deviceName, deviceID, deviceInterface):
 
     deviceParams = {}
 
     #  query the connection parameters for this device
-    sql = ("SELECT device_parameter,parameter_value FROM device_configuration" +
+    sql = ("SELECT device_parameter,parameter_value FROM " + schema + ".device_configuration" +
             " WHERE device_id=" + deviceID)
     paramQuery = db.dbQuery(sql)
 

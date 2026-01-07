@@ -54,6 +54,7 @@ from acquisition.SensorMonitor import SensorMonitor
 import messagedlg
 import listseldialog
 import codendstatusdlg
+import CPS.catchHome as catchHomeSWFSC
 
 
 class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
@@ -92,11 +93,13 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.catchBtn.setPalette(self.black)
         self.lengthBtn.setPalette(self.black)
         self.specBtn.setPalette(self.black)
+        self.swfscCatchBtn.setPalette(self.black)
 
         #  Set up the signals and slots
         self.partitionBox.activated[int].connect(self.getPartition)
         self.haulBtn.clicked.connect(self.getHaul)
         self.catchBtn.clicked.connect(self.getCatch)
+        self.swfscCatchBtn.clicked.connect(self.getCatchSWFSC)
         self.specBtn.clicked.connect(self.getSpecimen)
         self.lengthBtn.clicked.connect(self.getLength)
         self.fixSpeciesBtn.clicked.connect(self.goFixSpecies)
@@ -121,7 +124,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
 
         # get the scientist - first get the list of active scientists
         self.sciList=[]
-        sql = ("SELECT scientist FROM personnel WHERE active=1"
+        sql = ("SELECT scientist FROM " + self.schema + ".personnel WHERE active=1"
                 " ORDER BY scientist")
         query = self.db.dbQuery(sql)
         for scientist, in query:
@@ -153,7 +156,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
 
         #  update this workstation's status to "Open". We also update the
         #  current_event value
-        sql = ("UPDATE workstations SET status='open', current_event=" +
+        sql = ("UPDATE " + self.schema + ". workstations SET status='open', current_event=" +
                 self.activeHaul + " WHERE workstation_ID=" +
                 self.workStation)
         self.db.dbExec(sql)
@@ -161,6 +164,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         #  Set the visibility of the action buttons based on the actions specified for this station
         self.haulBtn.hide()
         self.catchBtn.hide()
+        self.swfscCatchBtn.hide()
         self.lengthBtn.hide()
         self.specBtn.hide()
         if 'haul' in parent.modules:
@@ -171,10 +175,12 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             self.lengthBtn.show()
         if 'specimen' in parent.modules:
             self.specBtn.show()
+        if 'catchswfsc' in parent.modules:
+            self.swfscCatchBtn.show()
         self.haulBtn.setEnabled(True)
 
         #  check if we're reloading data and enable buttons if so
-        sql = ("SELECT parameter_value FROM event_data WHERE event_id=" + self.activeHaul +
+        sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE event_id=" + self.activeHaul +
                 " AND ship=" + self.ship + " AND survey=" + self.survey +
                 " AND event_parameter='PartitionWeightType'")
         query = self.db.dbQuery(sql)
@@ -185,7 +191,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             self.catchBtn.setEnabled(True)
 
             #  now check to see if there are any existing samples
-            sql = ('SELECT sample_id FROM samples WHERE event_id=' + self.activeHaul +
+            sql = ('SELECT sample_id FROM ' + self.schema + '.samples WHERE event_id=' + self.activeHaul +
                     ' AND ship=' + self.ship + ' AND survey=' + self.survey)
             query = self.db.dbQuery(sql)
             if query.first():
@@ -213,7 +219,9 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.partitions=[]
         self.partitionBox.clear()
         #  get the possible partitions for this gear
-        sql = ("SELECT GEAR_PARTITIONS.PARTITION, EVENTS.GEAR FROM GEAR_OPTIONS, GEAR_PARTITIONS, EVENTS WHERE" +
+        sql = ("SELECT GEAR_PARTITIONS.PARTITION, EVENTS.GEAR FROM " + self.schema + ".GEAR_OPTIONS, " + 
+               self.schema + ".GEAR_PARTITIONS, " + 
+               self.schema + ".EVENTS WHERE" +
                 " (GEAR_PARTITIONS.PARTITION = GEAR_OPTIONS.PARTITION) and (GEAR_OPTIONS.GEAR = EVENTS.GEAR)" +
                 " and ((EVENTS.SHIP = " + self.ship + " ) AND (EVENTS.SURVEY = " + self.survey + ") AND" +
                 " (EVENTS.EVENT_ID = " + self.activeHaul + ") AND (GEAR_PARTITIONS.PARTITION_TYPE = 'Catch'))" +
@@ -252,7 +260,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.activePartition = self.partitionBox.currentText()
 
         #  check if the codend status has been set
-        sql = ("SELECT * FROM event_data WHERE ship = " + self.ship +
+        sql = ("SELECT * FROM " + self.schema + ".event_data WHERE ship = " + self.ship +
                 " AND survey = " + self.survey + " and event_id = " +
                 self.activeHaul+ " AND partition = '"+ self.activePartition +
                 "' AND event_parameter = 'CodendStatus'")
@@ -294,7 +302,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.sensorMonitor.SensorError.connect(self.sensorError)
 
         #  get the devices attached to this workstation
-        self.deviceData = devices.getDevices(self.db, self.workStation)
+        self.deviceData = devices.getDevices(self.db, self.workStation, self.schema)
 
         #  set up each device
         for deviceName in self.deviceData:
@@ -302,7 +310,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             #  try to get the configuration parameters for this device
             #  this will fail if a required parameter is missing.
             try:
-                deviceParams = devices.getDeviceParameters(self.db, deviceName,
+                deviceParams = devices.getDeviceParameters(self.db, self.schema, deviceName,
                         self.deviceData[deviceName]['id'],
                         self.deviceData[deviceName]['interface'])
             except Exception as e:
@@ -366,7 +374,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             return
 
         #  get the existing codend status
-        sql = ("SELECT parameter_value FROM event_data WHERE ship = " + self.ship +
+        sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship = " + self.ship +
                 " and survey = " + self.survey + " and event_id = " +
                 self.activeHaul + " and partition = '" + self.activePartition +
                 "' AND event_parameter = 'CodendStatus'")
@@ -386,7 +394,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             newStatus = self.codendstate.state_value
             if newStatus != currentCodendState:
                 #  and update the database entry
-                sql = ("UPDATE event_data SET parameter_value='" + newStatus +
+                sql = ("UPDATE " + self.schema + ".event_data SET parameter_value='" + newStatus +
                         "' WHERE ship = " + self.ship + " and survey = " +
                         self.survey + " and event_id = " + self.activeHaul +
                         " and partition = '" +  self.activePartition +
@@ -433,7 +441,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.catchBtn.setPalette(self.black)
 
         #  now check to see if we should enable the length and specimen buttons
-        sql = ('SELECT sample_id FROM samples WHERE event_id=' + self.activeHaul +
+        sql = ('SELECT sample_id FROM ' + self.schema + '.samples WHERE event_id=' + self.activeHaul +
                 ' AND ship=' + self.ship + ' AND survey=' + self.survey)
         query = self.db.dbQuery(sql)
         if query.first():
@@ -441,6 +449,14 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             #  and specimen buttons.
             self.lengthBtn.setEnabled(True)
             self.specBtn.setEnabled(True)
+
+    def getCatchSWFSC(self):
+        #  show the catch form
+        catchWindow = catchHomeSWFSC.catchHome(self)
+        catchWindow.exec()
+
+        #  set the button color back now that the form is closed
+        self.catchBtn.setPalette(self.black)
 
 
     def getLength(self):
@@ -542,12 +558,12 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         elif self.sensorsStopping == False:
 
             #  set the status for this workstation to closed
-            sql = ("UPDATE workstations SET status='closed', " +
+            sql = ("UPDATE " + self.schema + ".workstations SET status='closed', " +
                     "current_event=0 WHERE workstation_ID=" + self.workStation)
             self.db.dbExec(sql)
 
             #  check if we're the last station working on this event to close
-            sql = ("SELECT workstation_id FROM workstations WHERE status='open' AND " +
+            sql = ("SELECT workstation_id FROM " + self.schema + ".workstations WHERE status='open' AND " +
                     "current_event=" + self.activeHaul)
             query = self.db.dbQuery(sql)
 
@@ -570,7 +586,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 self.totalHaulWeight()
 
                 # this is the last station to close - reset the active haul
-                sql = ("UPDATE application_configuration SET parameter_value = 0" +
+                sql = ("UPDATE " + self.schema + ".application_configuration SET parameter_value = 0" +
                         " WHERE parameter = 'ActiveHaul'")
                 self.db.dbExec(sql)
 
@@ -624,7 +640,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         for partition in self.partitions:
 
             #  check if this partition is not_subsampled
-            sql = ("SELECT parameter_value FROM event_data WHERE ship=" + self.ship +
+            sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship=" + self.ship +
                     " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                     " AND partition='" + partition +"' AND event_parameter='PartitionWeightType'")
             query = self.db.dbQuery(sql)
@@ -635,7 +651,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 total_weight = 0
 
                 #  get the sample parent ID
-                sql = ("SELECT sample_id FROM samples WHERE ship=" + self.ship +
+                sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
                         " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                         " AND partition='" + partition + "' AND sample_type='WholeHaul'")
                 query = self.db.dbQuery(sql)
@@ -643,7 +659,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 parent_id = int(parent_id)
 
                 #  get the sample IDs associated with this parent
-                sql = ("SELECT sample_id FROM samples WHERE ship=" + self.ship +
+                sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
                         " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                         " AND parent_sample=" + str(parent_id))
                 sampleQuery, = self.db.dbQuery(sql)
@@ -651,7 +667,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 #  loop thru those samples and add up the baskets
                 for sample_id in sampleQuery:
                     #  get the weight of all baskets of this sample id
-                    sql = ("SELECT weight FROM baskets WHERE ship=" + self.ship +
+                    sql = ("SELECT weight FROM " + self.schema + ".baskets WHERE ship=" + self.ship +
                             " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
                             " AND sample_id=" + sample_id)
                     query = self.db.dbQuery(sql)
@@ -664,7 +680,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                             pass
 
                 #  update the partition weight in EVENT_DATA
-                sql = ("UPDATE event_data set parameter_value=" + str(round(total_weight,3)) +
+                sql = ("UPDATE " + self.schema + ".event_data set parameter_value=" + str(round(total_weight,3)) +
                         " WHERE ship=" + self.ship + " AND survey=" + self.survey +
                         " AND event_id=" + self.activeHaul + " AND partition='" +
                         partition + "' AND event_parameter='PartitionWeight'")
@@ -700,7 +716,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             self.db.dbExec(sql)
 
             #  find all the unique species samples
-            sql = ("SELECT sample_id, parent_sample, partition, species_code, subcategory FROM samples " +
+            sql = ("SELECT sample_id, parent_sample, partition, species_code, subcategory FROM " + self.schema + ".samples " +
                     "WHERE ship=" + self.ship + " AND survey=" + self.survey + " AND event_id=" + event_id +
                     " AND sample_type='Species'")
             sampleQuery = self.db.dbQuery(sql)
@@ -719,7 +735,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                     vals = vals[0]
 
                     #  get species name
-                    sql = ("SELECT scientific_name, common_name FROM species WHERE species_code=" + species_code)
+                    sql = ("SELECT scientific_name, common_name FROM " + self.schema + ".species WHERE species_code=" + species_code)
                     sppQuery = self.db.dbQuery(sql)
                     sci_name, common_name = sppQuery.first()
 
@@ -773,7 +789,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         for partition in self.partitions:
             # loop though samples in this partition
             sql = ("SELECT species.common_name, samples.sample_id, samples.species_code, samples.subcategory" +
-                    " FROM species, samples WHERE species.species_code = samples.species_code" +
+                    " FROM " + self.schema + ".species, samples WHERE species.species_code = samples.species_code" +
                     " AND samples.event_id=" + self.activeHaul + " AND samples.ship=" + self.ship +
                     " AND samples.survey=" + self.survey + " AND samples.partition='" +
                     partition + "' and samples.sample_type = 'Species'")
@@ -783,7 +799,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             for species, key, code, subcat in sampleQuery:
 
                 # validation #1 - check for species samples without weights
-                sql = ("SELECT * FROM baskets WHERE sample_id=" + key+" AND event_id=" +
+                sql = ("SELECT * FROM " + self.schema + ".baskets WHERE sample_id=" + key+" AND event_id=" +
                         self.activeHaul + " AND ship=" + self.ship +
                         " AND survey=" + self.survey)
                 query = self.db.dbQuery(sql)
@@ -799,7 +815,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                         return
                     else:
                         #  user decided to delete the sample that doesn't have a weight
-                        sql = ("DELETE FROM samples WHERE samples.sample_id = " + key+
+                        sql = ("DELETE FROM " + self.schema + ".samples WHERE samples.sample_id = " + key+
                                 " AND samples.event_id=" + self.activeHaul +
                                 " AND samples.ship=" + self.ship +
                                 " AND samples.survey=" + self.survey)
@@ -809,7 +825,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 # validation #2 - are there samples of type measure lacking specimen (or length) data
 
                 #  get the total basket weight for this sample
-                sql = ("SELECT sum(weight) FROM baskets WHERE basket_type = 'Measure'" +
+                sql = ("SELECT sum(weight) FROM " + self.schema + ".baskets WHERE basket_type = 'Measure'" +
                         " AND sample_id=" + key+" AND event_id=" +
                         self.activeHaul + " AND ship=" + self.ship +
                         " AND survey=" + self.survey)
@@ -820,7 +836,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                 #  make sure we have at least one basket with a weight for this sample
                 if basketWeight != 0:
                     # there are "measure" baskets - check if there are specimen
-                    sql = ("SELECT specimen_id FROM specimen WHERE sample_id = " + key+
+                    sql = ("SELECT specimen_id FROM " + self.schema + ".specimen WHERE sample_id = " + key+
                             " AND event_id=" + self.activeHaul + " AND ship=" +
                             self.ship + " AND survey=" + self.survey)
                     query = self.db.dbQuery(sql)
@@ -831,7 +847,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                         #  validation #3 - verify that there is an appropriate sample weight for
                         #  the number of specimen. First the get length/weight regression params
                         #  if available for this species
-                        sql = ("SELECT parameter_value FROM species_data WHERE species_code="+
+                        sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code="+
                                 code + " AND subcategory='" + subcategory + "' AND lower(" +
                                 "species_parameter)='a_param'")
                         query = self.db.dbQuery(sql)
@@ -843,7 +859,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                                 self.aParm=None
                         else:
                             self.aParm=None
-                        sql = ("SELECT parameter_value FROM species_data WHERE species_code="+
+                        sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code="+
                                 code + " AND subcategory='" + subcategory +
                                 "' AND lower(species_parameter)='b_param'")
                         query = self.db.dbQuery(sql)
@@ -860,7 +876,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                         #  a theoretical weight
                         if self.aParm and self.bParm:
                             #  get the lengths
-                            sql = ("SELECT measurement_value FROM  measurements WHERE " +
+                            sql = ("SELECT measurement_value FROM  " + self.schema + ".measurements WHERE " +
                                     "sample_id=" + key + "  AND event_id=" + self.activeHaul +
                                     " AND ship=" + self.ship +" AND survey=" + self.survey+
                                     " AND LOWER(measurement_type) LIKE '%length%'")

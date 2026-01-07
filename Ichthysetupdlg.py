@@ -70,7 +70,7 @@ class Ichthysetupdlg(QDialog, ui_IcthystickSetup.Ui_IchthystickSetup):
         #  and look for a device that can do length measurements
         if self.db:
             #  get all of the devices on this workstation
-            deviceData = devices.getDevices(self.db, self.workStation)
+            deviceData = devices.getDevices(self.db, self.workStation, self.schema)
 
             #  find the length device on this workstation
             foundLength = False
@@ -91,7 +91,7 @@ class Ichthysetupdlg(QDialog, ui_IcthystickSetup.Ui_IchthystickSetup):
                 #  try to get the configuration parameters for this device
                 #  this will fail if a required parameter is missing.
                 try:
-                    deviceParams = devices.getDeviceParameters(self.db, lengthDevice,
+                    deviceParams = devices.getDeviceParameters(self.db, self.schema, lengthDevice,
                             deviceData[lengthDevice]['id'],
                             deviceData[lengthDevice]['interface'])
                 except Exception as e:

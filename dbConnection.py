@@ -35,7 +35,7 @@
 """
 import logging
 from PyQt6 import QtSql
-
+from PyQt6.QtCore import QDateTime
 
 class SQLError(Exception):
 
@@ -273,6 +273,33 @@ class dbConnection:
         self.hasTransactions = False
         self.preparedQuery = None
 
+    def createTimeStamp(self, dateTime):
+        if (self.isPostgres):
+            return "to_timestamp('" + dateTime + "', 'YYYY-MM-DD HH24:MI:SS.FF3')"
+        else:
+            return dateTime
+            
+    def formatTimeStamp(self, dateName):
+        if (self.isPostgres):
+            format = 'YYYY-MM-DD HH24:MI:SS.FF3'
+            return "to_char(to_timestamp(" + dateName + ", '" + format + "'), '" + format + "')"
+        else:
+            format = 'MMDDYYYY HH24:MI:SS.FF3'
+            return "to_char(to_timestamp(" + dateName + ",'" + format + "'))"
+        
+    def createTime(self, time):
+        if (self.isPostgres):
+            return QDateTime().fromString(time, 'YYYY-MM-DD hh:mm:ss.zzz')
+        else:
+            return QDateTime().fromString(time, 'MMddyyyy hh:mm:ss.zzz')
+    
+    def formatTime(self, time = None):
+        if (not time):
+            time = QDateTime.currentDateTime()
+        if (self.isPostgres):
+            return str(time.toString('yyyy-MM-dd hh:mm:ss.zzz'))
+        else:
+            return str(time.toString('MMddyyyy hh:mm:ss.zzz'))
 
     def startTransaction(self):
         '''

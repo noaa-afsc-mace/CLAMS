@@ -96,7 +96,7 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         self.meta_entered = False
         self.scientist = "Unknown"
         self.gear = gearTypeDefault
-        self.displayMeasurements = ['Latitude', 'Longitude', 'BottomDepth18']
+        self.displayMeasurements = ['Latitude', 'Longitude']
         self.meta_info = ['Operator', 'Collection', 'FishingMode']
         self.streamEQHBLogInterval = None
         self.streamSlowLogInterval = None
@@ -176,6 +176,10 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         for b in self.buttons:
             b.clicked.connect(self.set_event)
 
+        # set average values to display
+        self.avgLabels = ['AvgSOG', 'AvgHeading', 'AvgWindSpeed', 'AvgBottomDepth18',
+                          'AvgSST-TSG45', 'AvgSalinity-TSG45', 'AvgWireout-Block', 'AvgSTW']
+
         # set up the initialization timer
         initTimer = QTimer(self)
         initTimer.setSingleShot(True)
@@ -248,14 +252,14 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         self.sensorMonitor.SensorError.connect(self.device_error)
 
         #  get the devices attached to this workstation
-        self.deviceData = devices.getDevices(self.db, self.workStation)
+        self.deviceData = devices.getDevices(self.db, self.workStation, self.schema)
         
         #  set up each device
         for deviceName in self.deviceData:
             #  try to get the configuration parameters for this device
             #  this will fail if a required parameter is missing.
             try:
-                deviceParams = devices.getDeviceParameters(self.db, deviceName,
+                deviceParams = devices.getDeviceParameters(self.db, self.schema, deviceName,
                                                            self.deviceData[deviceName]['id'],
                                                            self.deviceData[deviceName]['interface'])
             except Exception as e:
@@ -307,6 +311,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         :return:
         """
         self.disable_enable_buttons('disable', self.doneBtn)
+        if Events.NetOnDeck.name in self.button_order:
+            self.doneBtn.setEnabled(True)
+        
         self.disable_enable_buttons('disable', self.pb_abort)
 
         # disable all event buttons (except com)
@@ -408,7 +415,7 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         td_elapsed = 0
 
         # get event types entered by timestamp
-        ev_sql = ("SELECT event_parameter, to_char(to_timestamp(parameter_value,'MMDDYYYY HH24:MI:SS.FF3')) AS times "
+        ev_sql = ("SELECT event_parameter, " + self.db.formatTimeStamp("parameter_value") + " AS times "
                   "FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
                   " AND event_id=" + self.activeEvent + " AND partition='MainTrawl' AND event_parameter IN "
                                                         "('"  + 
@@ -449,12 +456,12 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                 # update the button's table values
                 self.dataTable.setItem(row, 0, QTableWidgetItem(param))
                 self.dataTable.setItem(row, 1, QTableWidgetItem(val))
-                self.btnTimes[row] = QDateTime().fromString(val, 'MMddyyyy hh:mm:ss.zzz')
+                self.btnTimes[row] = self.db.createTime(val)
 
                 buttonValues = self.get_event_stream_vals(val, self.displayMeasurements)
                 self.dataTable.setItem(row, 2, QTableWidgetItem(buttonValues[0]))
                 self.dataTable.setItem(row, 3, QTableWidgetItem(buttonValues[1]))
-                self.dataTable.setItem(row, 4, QTableWidgetItem(buttonValues[2]))
+                #self.dataTable.setItem(row, 4, QTableWidgetItem(buttonValues[2]))
 
                 if ind != None:
                     self.buttons[ind].setPalette(self.yellow)
@@ -568,7 +575,7 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         dt = [float('inf')] * len(parameters)
 
         #  convert our time to a QDateTime
-        time = QDateTime().fromString(time, 'MMddyyyy hh:mm:ss.zzz')
+        time = self.db.createTime(time)
 
         #  query the data from haul_stream data table within our window
         inClause = "'" + "','".join(parameters) + "'"
@@ -641,7 +648,7 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
 
         # save in DB
         # get the current timestamp
-        cur_time = QDateTime.currentDateTime().toString('MMddyyyy hh:mm:ss.zzz')
+        cur_time = self.db.formatTime()
 
         # Checks whether an entry exists in event_data table
         # if so, update value if not, create new row.
@@ -746,11 +753,11 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
 
         # get the current time
         datetime = QDateTime.currentDateTime()
-        time = str(datetime.toString('MMddyyyy hh:mm:ss.zzz'))
+        time = self.db.formatTime(datetime)
 
         # iterate thru the the list of SCS sensor datagrams and write to database
         if self.testing:
-            self.dispVector = ['testlat', 'testlon', 'testdepth']
+            self.dispVector = ['testlat', 'testlon']
         else:
             wroteToDb = False
 
@@ -809,7 +816,37 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         popup for entering the performance of the operation and allowing to check/enter comments
         :return:
         """
-        if Events.NetOnDeck.name in self.button_order:
+        # Check all metadata fields have been entered in event_data and gear_accessory tables
+        isValid = True
+        errorMsg = "Metadata values missing, metadata must be completed before event can be completed."
+
+        metadataFields = [member.value for member in metadlg.MetadataFields]
+        formattedMeta = ", ".join([f"'{x}'" for x in metadataFields])
+        sql = ("SELECT count(*) FROM " + self.schema + 
+                    ".event_data where event_id=" + str(self.activeEvent) + ' and ' +
+                    "event_parameter in (" + formattedMeta + ")")
+        resuls = self.db.dbQuery(sql)
+        count, = resuls.first()
+
+        if int(count) != len(metadlg.MetadataFields):
+            self.message.setMessage(self.errorIcons[0], self.errorSounds[0], errorMsg, "error")
+            self.message.show()
+            isValid = False
+
+        gearFields = [member.value for member in metadlg.GearTypeFields]
+        formattedGear = ", ".join([f"'{x}'" for x in gearFields])
+        sql = ("SELECT count(*) FROM " + self.schema + 
+                    ".gear_accessory where event_id=" + str(self.activeEvent) +
+                    " and gear_accessory in (" + formattedGear + ")")
+        resuls = self.db.dbQuery(sql)
+        count, = resuls.first()
+
+        if int(count) != len(metadlg.GearTypeFields):
+            self.message.setMessage(self.errorIcons[0], self.errorSounds[0], errorMsg, "error")
+            self.message.show()
+            isValid = False
+
+        if Events.NetOnDeck.name in self.button_order and isValid:
             # stop recording
             self.recording = False
             # set up the finish dialog
@@ -986,13 +1023,13 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                     exists_sql = ("SELECT event_parameter FROM " + self.schema +
                                   ".event_data WHERE ship = " + self.ship + " AND survey = " + self.survey +
                                   " AND event_id = " + self.activeEvent + " AND partition = 'MainTrawl' "
-                                                                          "AND event_parameter = '" + event_param + "'")
+                                  "AND event_parameter = '" + event_param + "'")
                     exists_query = self.db.dbQuery(exists_sql)
                     param, = exists_query.first()
 
                     if not param:
                         # get avg of the data between the TD and the HB times in event_stream_data
-                        avg_sql = ("SELECT AVG(measurement_value) FROM " + self.schema
+                        avg_sql = ("SELECT AVG(CAST(measurement_value as float)) FROM " + self.schema
                                    + ".event_stream_data WHERE measurement_type='" + dev_name
                                    + "' AND time_stamp BETWEEN '" + td_time + "' AND '" + hb_time + "'")
                         try:

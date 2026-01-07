@@ -43,7 +43,7 @@ from PyQt6.QtCore import *
 
 class OvaryWeightRange(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -63,7 +63,7 @@ class OvaryWeightRange(QObject):
 
         #  Get the maxgsi parameter. Since this value applies to all species, we
         #  stuck it in the application_configuration table.
-        sql = "SELECT parameter_value FROM application_configuration WHERE lower(parameter)='maxgsi'"
+        sql = "SELECT parameter_value FROM " + schema + ".application_configuration WHERE lower(parameter)='maxgsi'"
         query = db.dbQuery(sql)
 
         #  extract returned results

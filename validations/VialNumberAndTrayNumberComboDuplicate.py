@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class VialNumberAndTrayNumberComboDuplicate(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -63,9 +63,10 @@ class VialNumberAndTrayNumberComboDuplicate(QObject):
 
         #  store a reference to our db object
         self.db = db
+        self.schema = schema
 
         #  get the active survey ID
-        sql = "SELECT parameter_value FROM application_configuration WHERE parameter = 'ActiveSurvey'"
+        sql = "SELECT parameter_value FROM " + schema + ".application_configuration WHERE parameter = 'ActiveSurvey'"
         query = self.db.dbQuery(sql)
         self.survey, = query.first()
 
@@ -99,12 +100,12 @@ class VialNumberAndTrayNumberComboDuplicate(QObject):
         trayNumber = values[index]
 
         sql = ("SELECT s.specimen_id, dna_tray_number.measurement_value as dna_tray_number, dna_vial_number.measurement_value as dna_vial_number, dna_vial_number.survey as survey" +
-        " from (select unique specimen_id from measurements) s" +
-        " left outer join measurements dna_tray_number on s.specimen_id = dna_tray_number.specimen_id AND dna_tray_number.measurement_type = 'dna_tray_number'" +
-        " left outer join measurements dna_vial_number on s.specimen_id = dna_vial_number.specimen_id AND dna_vial_number.measurement_type = 'dna_vial_number'" +
-        " where dna_vial_number.survey =" + self.survey +
-        " and dna_tray_number.measurement_value = " + trayNumber +
-        " and dna_vial_number.measurement_value = " + currentValue)
+        " from (select distinct specimen_id from " + self.schema + ".measurements) s" +
+        " left outer join " + self.schema + ".measurements dna_tray_number on s.specimen_id = dna_tray_number.specimen_id AND dna_tray_number.measurement_type = 'dna_tray_number'" +
+        " left outer join " + self.schema + ".measurements dna_vial_number on s.specimen_id = dna_vial_number.specimen_id AND dna_vial_number.measurement_type = 'dna_vial_number'" +
+        " where dna_vial_number.survey ='" + self.survey +
+        "' and dna_tray_number.measurement_value = '" + trayNumber +
+        "' and dna_vial_number.measurement_value = '" + currentValue + "'")
 
         query = self.db.dbQuery(sql)
         val = query.first()

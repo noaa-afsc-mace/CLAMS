@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class LengthRange(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -61,7 +61,7 @@ class LengthRange(QObject):
         QObject.__init__(self, None)
 
         #  Get the minimum length for this species from the species_data table
-        sql = ("SELECT parameter_value FROM species_data WHERE species_code=" + speciesCode +
+        sql = ("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code=" + speciesCode +
                " AND subcategory='" + subcategory + "' AND lower(species_parameter)='min_length'")
         query = db.dbQuery(sql)
         minLength, = query.first()
@@ -74,7 +74,7 @@ class LengthRange(QObject):
             self.minLength = 0
 
         #  Get the maximum length for this species from the species_data table
-        sql = ("SELECT parameter_value FROM species_data WHERE species_code="+ speciesCode +
+        sql = ("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+ speciesCode +
                " AND subcategory='"+subcategory+"' AND lower(species_parameter)='max_length'")
         query = db.dbQuery(sql)
         maxLength, = query.first()

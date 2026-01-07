@@ -14,45 +14,38 @@
 #  DOCUMENTATION; OR (2) TO PROVIDE TECHNICAL SUPPORT TO USERS.
 
 """
-.. module:: AddCatchSpcDlg
+.. module:: cpsAddCatchSpcDlg
 
-    :synopsis: AddCatchSpcDlg presents the dialog used to add samples
+    :synopsis: cps specific dialog used to add samples
                to the Catch module. It allows the user to search for
                the species they want to add, then add it to the
                specified parent sample.
 
-| Developed by:  Rick Towler   <rick.towler@noaa.gov>
-|                Kresimir Williams   <kresimir.williams@noaa.gov>
+| Developed by:  Melina Shak <melina.shak@noaa.gov>
 | National Oceanic and Atmospheric Administration (NOAA)
-| National Marine Fisheries Service (NMFS)
-| Alaska Fisheries Science Center (AFSC)
-| Midwater Assesment and Conservation Engineering Group (MACE)
+| National Marine Fisheries Service (NMFS
 |
 | Author:
-|       Rick Towler   <rick.towler@noaa.gov>
-|       Kresimir Williams   <kresimir.williams@noaa.gov>
+|       Melina Shak <melina.shak@noaa.gov>
 | Maintained by:
-|       Rick Towler   <rick.towler@noaa.gov>
-|       Kresimir Williams   <kresimir.williams@noaa.gov>
-|       Mike Levine   <mike.levine@noaa.gov>
-|       Nathan Lauffenburger   <nathan.lauffenburger@noaa.gov>
+|       Melina Shak <melina.shak@noaa.gov>
 """
 
 #  imports
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
-from ui import  ui_AddCatchSpcDlg
+from ui import  ui_CPSAddCatchSpcDlg
 import listseldialog
 import sampletypeseldlg
 
 
-class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
+class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
 
     changed = pyqtSignal()
 
     def __init__(self, parent=None):
-        super(AddCatchSpcDlg, self).__init__(parent)
+        super(cpsAddCatchSpcDlg, self).__init__(parent)
 
         self.setupUi(self)
 
@@ -75,6 +68,9 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
         self.settings = parent.settings
         self.mixtureNames = {'100000':'WholeHaul', '100001':'SortingTable',
                 '100002':'Mix1', '100003':'SubMix1', '100004':'Mix2'}
+        self.parentSamples = parent.parentSamples
+        self.scientist = parent.scientist
+        self.isSubMix = False
 
         #  restore the application state
         self.appSettings = QSettings('CLAMS', 'AddCatchSppDialog')
@@ -112,10 +108,11 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
         self.addBtn.clicked.connect(self.sendSel)
         self.radio10.toggled[bool].connect(self.getSpcHistory)
         self.radioFull.toggled[bool].connect(self.clearAllChar)
+        self.inStateWaters.clicked.connect(self.toggleStateWaters)
+        self.subMixBtn.clicked.connect(self.setParentToSubMix)
 
         # parent sample buttons
-        self.buttons=[self.wholeHaulBtn, self.sortTableBtn, self.mix1Btn,
-                self.subMix1Btn, self.mix2Btn]
+        self.buttons=[self.subMixBtn]
 
         #  connect the sample button clicked signal to a method that manages their exclusivity
         #  it seems autoexclusive buttons in a container cannot all be unchecked. Once one is
@@ -174,10 +171,6 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
         for btn in self.buttons:
             btn.setChecked(False)
 
-        # set default values
-        if not self.whHaulFlag:
-            self.wholeHaulBtn.setEnabled(False)
-
         # find out if we have a mix1
         sql = ("SELECT sample_id FROM  " + self.schema + ".samples WHERE ship=" + self.ship +
                 " AND survey=" + self.survey+ " AND event_id=" + self.activeHaul +
@@ -187,8 +180,7 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
 
         if not sampleId:
             # no mix 1 in the system
-            self.mix1Btn.setEnabled(False)
-            self.subMix1Btn.setEnabled(False)
+            self.subMixBtn.setEnabled(False)
         else:
             # we have a mix 1 - check if we have a submix for mix 1
             sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
@@ -198,7 +190,7 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
             mixId, = query.first()
             if not mixId:
                 # no submix1
-                self.subMix1Btn.setEnabled(False)
+                self.subMixBtn.setEnabled(False)
 
         #  check if there is a mix2
         sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
@@ -206,9 +198,6 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
                 " AND partition ='" + self.activePartition + "' AND species_code=100004")
         query = self.db.dbQuery(sql)
         mixId, = query.first()
-        if not mixId:
-            #  there is no mix2
-            self.mix2Btn.setEnabled(False)
 
 
     def getDigit(self):
@@ -245,6 +234,30 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
         self.chars = newChars
         self.getList()
 
+    def toggleStateWaters(self):
+        if (self.inStateWaters.isChecked()):
+            self.subMixBtn.setEnabled(True)
+            
+        else:
+            self.subMixBtn.setEnabled(False)
+    
+    def setParentToSubMix(self):
+        self.isSubMix = True
+        # Check if submix already exists
+        sql = ("select sample_id from samples where survey=" + self.survey + 
+               " AND event_id=" + self.activeHaul + 
+               " AND parent_sample=" + self.parentSamples + 
+               " AND sample_type='SubMix'")
+        query = self.db.dbQuery(sql)
+        hasSubMix, = query.first()
+
+        # Insert submix if it doesn't already exist
+        if not hasSubMix:
+            sql = ("INSERT INTO " + self.schema + ".samples (ship,survey,event_id,partition,sample_type," +
+                "species_code,subcategory,parent_sample,scientist) VALUES("+
+                self.ship +"," + self.survey+"," + self.activeHaul+",'" + self.activePartition+
+                "','SubMix',3 ,'None', " + self.parentSamples+",'" + self.scientist+"')")
+            self.db.dbExec(sql)
 
     def getList(self):
 
@@ -389,23 +402,9 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
                 # you can only choose Mix1!!
                 for btn in self.buttons:
                     btn.setEnabled(False)
-                self.mix1Btn.setEnabled(True)
-                self.mix1Btn.setChecked(True)
 
 
     def sendSel(self):
-
-        #  get the selected parent sample
-        self.parentSample = None
-        for btn in self.buttons:
-            if btn.isChecked():
-                self.parentSample = btn.text()
-                break
-        if self.parentSample == None:
-            self.message.setMessage(self.errorIcons[0],self.errorSounds[0],
-                    "You need to select a parent sample! ", 'info')
-            self.message.exec()
-            return
 
         if self.listOrigin == None:
             return
@@ -463,6 +462,9 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg.Ui_addcatchspcDlg):
         #  only clear the text box and list if this isn't a history pick
         if not self.radio10.isChecked():
             self.clearAllChar()
+        
+        # Reset submix back to false, will be set to true if submix button selected
+        self.isSubMix = False
 
 
     def getSpcHistory(self):

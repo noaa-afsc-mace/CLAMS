@@ -269,12 +269,12 @@ class CLAMSCatchSummaryLoader(QMainWindow, ui_CatchSummaryLoader.Ui_MainWindow):
         self.statusBar().showMessage("Updating Catch Summary for Event " + event_id);
 
         #  delete existing data for this event
-        sql = ("DELETE FROM catch_summary WHERE ship=" + ship + " AND survey=" + survey +
+        sql = ("DELETE FROM " + self.schema + ".catch_summary WHERE ship=" + ship + " AND survey=" + survey +
                 " AND event_id=" + event_id)
         self.db.dbExec(sql)
 
         #  find all the unique species samples
-        sql = ("SELECT sample_id, parent_sample, partition, species_code, subcategory FROM samples " +
+        sql = ("SELECT sample_id, parent_sample, partition, species_code, subcategory FROM " + self.schema + ".samples " +
                 "WHERE ship=" + ship + " AND survey=" + survey + " AND event_id=" + event_id +
                 " AND sample_type='Species'")
         sampleQuery = self.db.dbQuery(sql)
@@ -287,12 +287,12 @@ class CLAMSCatchSummaryLoader(QMainWindow, ui_CatchSummaryLoader.Ui_MainWindow):
             if status:
                 vals = vals[0]
                 #  yes - get species name
-                sql = ("SELECT scientific_name, common_name FROM species WHERE species_code=" + species_code)
+                sql = ("SELECT scientific_name, common_name FROM " + self.schema + ".species WHERE species_code=" + species_code)
                 sppQuery = self.db.dbQuery(sql)
                 sci_name, common_name = sppQuery.first()
 
                 #  then insert results into catch summary table
-                sql = ("INSERT INTO catch_summary (ship,survey,event_id,partition,sample_id,parent_sample," +
+                sql = ("INSERT INTO " + self.schema + ".catch_summary (ship,survey,event_id,partition,sample_id,parent_sample," +
                         "scientific_name,species_code,common_name,subcategory,weight_in_haul,sampled_weight," +
                         "number_in_haul,sampled_number,frequency_expansion,in_mix,whole_hauled) VALUES(" +
                         ship + "," + survey + "," + event_id + ",'" + partition + "'," + sample_id + "," +

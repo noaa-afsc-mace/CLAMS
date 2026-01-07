@@ -80,6 +80,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
 
         #  copy some info from parent for convenience
         self.db = parent.db
+        self.schema = parent.schema
         self.sensorMonitor = parent.sensorMonitor
         if not self.db.db.isOpen():
             self.db.dbOpen()
@@ -137,7 +138,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         self.sumTable.setColumnCount(1)
 
         # set default sampling Method
-        sql = "SELECT sampling_method FROM sampling_methods"
+        sql = "SELECT sampling_method FROM " + self.schema + ".sampling_methods"
         query = self.db.dbQuery(sql)
         for sampling_method,  in query:
             self.samplingMethodBox.addItem(sampling_method)
@@ -195,12 +196,12 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         self.sensorMonitor.SensorDataReceived.connect(self.getAuto)
 
         # get the sound for the board
-        board_sql = ("SELECT device_id FROM measurement_setup WHERE workstation_id = " + self.workStation +
+        board_sql = ("SELECT device_id FROM " + self.schema + ".measurement_setup WHERE workstation_id = " + self.workStation +
                      " AND gui_module = 'Length'")
         board_query = self.db.dbQuery(board_sql)
         device_id, = board_query.first()
         if device_id:
-            sql = ("SELECT parameter_value FROM device_configuration WHERE device_id = " + device_id
+            sql = ("SELECT parameter_value FROM " + self.schema + ".device_configuration WHERE device_id = " + device_id
                    + " AND device_parameter = 'SoundFile'")
         query1 = self.db.dbQuery(sql)
         sound_file, = query1.first()
@@ -230,7 +231,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         # populate species window with species that have been measured in by the catch form
         # first gather all the species information for the current haul and partition
         sql = ("SELECT species.common_name, species.scientific_name, samples.species_code, samples.sample_id, samples.subcategory"+
-                    " FROM species, samples, baskets"+
+                    " FROM " + self.schema + ".species, samples, baskets"+
                 " WHERE species.species_code = samples.species_code AND samples.ship=baskets.ship"+
                 " AND samples.survey=baskets.survey AND samples.event_id=baskets.event_id"+
                 " AND samples.sample_id=baskets.sample_id AND samples.ship="+self.ship+" AND samples.survey="+
@@ -245,7 +246,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         for common_name, scientific_name, species_code, sample_id,  subcategory in query:
 
             # check to see if the sample has a specified scientific or common name
-            sql0 = ("SELECT PARAMETER_VALUE FROM sample_data WHERE sample_parameter='sample_display_name' AND ship="+
+            sql0 = ("SELECT PARAMETER_VALUE FROM " + self.schema + ".sample_data WHERE sample_parameter='sample_display_name' AND ship="+
                     self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+ " AND sample_id="+sample_id)
             query0 = self.db.dbQuery(sql0)
 
@@ -307,7 +308,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         nParms = len(params)
         vals = [None] * nParms
         for i in range(nParms):
-            sql = ("SELECT parameter_value FROM species_data WHERE species_code=" +
+            sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code=" +
                     self.activeSpcCode+" AND subcategory='" + self.activeSpcSubcat +
                     "' AND lower(species_parameter)='" + params[i] + "'")
             query = self.db.dbQuery(sql)
@@ -568,7 +569,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                       " measurements.event_id, "+
                       " measurements.specimen_id, "+
                       " measurements.measurement_value as length "+
-                    " FROM  measurements JOIN specimen ON "+
+                    " FROM  " + self.schema + ".measurements JOIN specimen ON "+
                       "  (measurements.ship = specimen.ship "+
                       " AND measurements.survey = specimen.survey "+
                       " AND measurements.event_id = specimen.event_id "+
@@ -581,7 +582,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                     " specimen.protocol_name ='Length_Sex') a "+
                   " LEFT OUTER JOIN "+
                     " (SELECT ship, survey, event_id, specimen_id, measurement_value as sex "+
-                    " FROM measurements "+
+                    " FROM " + self.schema + ".measurements "+
                     " WHERE measurement_type = 'sex') b     "+
                   " ON (b.ship = a.ship "+
                   " AND b.survey = a.survey "+
@@ -590,12 +591,12 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         else:
             sql = ("SELECT a.specimen_id, a.length, b.sex "+
                     " FROM "+
-                    " (SELECT measurements.ship, "+
+                    " (SELECT " + self.schema + ".measurements.ship, "+
                      "  measurements.survey, "+
                       " measurements.event_id, "+
                       " measurements.specimen_id, "+
                       " measurements.measurement_value as length "+
-                    " FROM  measurements JOIN specimen ON "+
+                    " FROM  " + self.schema + ".measurements JOIN specimen ON "+
                       "  (measurements.ship = specimen.ship "+
                       " AND measurements.survey = specimen.survey "+
                       " AND measurements.event_id = specimen.event_id "+
@@ -609,7 +610,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                     " specimen.workstation_id = "+self.workStation+") a "+
                   " LEFT OUTER JOIN "+
                     " (SELECT ship, survey, event_id, specimen_id, measurement_value as sex "+
-                    " FROM measurements "+
+                    " FROM " + self.schema + ".measurements "+
                     " WHERE measurement_type = 'sex') b     "+
                   " ON (b.ship = a.ship "+
                   " AND b.survey = a.survey "+
@@ -645,7 +646,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                       " measurements.event_id, "+
                       " measurements.specimen_id, "+
                       " measurements.measurement_value as length "+
-                    " FROM  measurements JOIN specimen ON "+
+                    " FROM " + self.schema + ". measurements JOIN specimen ON "+
                       "  (measurements.ship = specimen.ship "+
                       " AND measurements.survey = specimen.survey "+
                       " AND measurements.event_id = specimen.event_id "+
@@ -658,7 +659,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                     " specimen.protocol_name ='Length_Sex') a "+
                   " LEFT OUTER JOIN "+
                     " (SELECT ship, survey, event_id, specimen_id, measurement_value as sex "+
-                    " FROM measurements "+
+                    " FROM " + self.schema + ". measurements "+
                     " WHERE measurement_type = 'sex') b "+
                   " ON (b.ship = a.ship "+
                   " AND b.survey = a.survey "+
@@ -674,7 +675,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                       " measurements.event_id, "+
                       " measurements.specimen_id, "+
                       " measurements.measurement_value as length "+
-                    " FROM  measurements JOIN specimen ON "+
+                    " FROM " + self.schema + ". measurements JOIN specimen ON "+
                       "  (measurements.ship = specimen.ship "+
                       " AND measurements.survey = specimen.survey "+
                       " AND measurements.event_id = specimen.event_id "+
@@ -688,7 +689,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                     " specimen.workstation_id = "+self.workStation+") a "+
                   " LEFT OUTER JOIN "+
                     " (SELECT ship, survey, event_id, specimen_id, measurement_value as sex "+
-                    " FROM measurements "+
+                    " FROM " + self.schema + ".measurements "+
                     " WHERE measurement_type = 'sex') b "+
                   " ON (b.ship = a.ship "+
                   " AND b.survey = a.survey "+
@@ -725,14 +726,14 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         samplingMethod = self.samplingMethodBox.currentText()
 
         # write specimen table
-        sql_insert = ("INSERT INTO specimen (ship,survey,event_id,sample_id,workstation_id," +
+        sql_insert = ("INSERT INTO " + self.schema + ".specimen (ship,survey,event_id,sample_id,workstation_id," +
                 "scientist,sampling_method,protocol_name,comments) VALUES ("+self.ship+","+self.survey+
                 ","+self.activeHaul+ ","+self.sampleKey+","+self.workStation+",'"+self.scientist+"','"+
                 samplingMethod+"','Length_Sex','"+self.comment+"')")
         self.db.dbExec(sql_insert)
 
         #  get the key for the specimen record we just created
-        sql = ("SELECT max(specimen_id) FROM specimen WHERE workstation_id = "+
+        sql = ("SELECT max(specimen_id) FROM " + self.schema + ".specimen WHERE workstation_id = "+
                 self.workStation+" AND ship="+self.ship+ " AND survey="+self.survey+
                 " AND event_id="+self.activeHaul)
         query = self.db.dbQuery(sql)
@@ -744,20 +745,20 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         #  make sure we have a specimen key
         if (not self.specimenKey == None):
             #  Insert the length type that is selected in the lengthTypeBox combo 'len_type', now skip insert of 'length' type
-            sql = ("INSERT INTO measurements (ship, survey,event_id,sample_id,specimen_id," +
+            sql = ("INSERT INTO " + self.schema + ".measurements (ship, survey,event_id,sample_id,specimen_id," +
                     "measurement_type,device_id,measurement_value) VALUES ("+self.ship+","+self.survey+","+
                     self.activeHaul+ ","+self.sampleKey+","+self.specimenKey+",'"+len_type+"',"+self.activeDeviceId+
                     ",'"+str(self.value)+"')")
             self.db.dbExec(sql)
 
             # write sex
-            sql = ("INSERT INTO measurements (ship,survey,event_id,sample_id,specimen_id," +
+            sql = ("INSERT INTO " + self.schema + ".measurements (ship,survey,event_id,sample_id,specimen_id," +
                     "measurement_type,device_id,measurement_value) VALUES ("+self.ship+","+self.survey+","+
                     self.activeHaul+ ","+self.sampleKey+","+self.specimenKey+",'sex',0,'"+self.sex+"')")
             self.db.dbExec(sql)
 
             if self.overrideFlag:
-                sql = ("INSERT INTO overrides (ship,survey,event_id,table_name,scientist,description) VALUES ('"+
+                sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,table_name,scientist,description) VALUES ('"+
                         self.ship + "," + self.survey+ "," + self.activeHaul + "," +self.specimenKey+
                         "'measurements'," +self.scientist+"','Length is outside of valid range.')")
                 self.db.dbExec(sql)
@@ -790,7 +791,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
 
         # get any comments
         self.comment = ''
-        sql = ("SELECT comments FROM specimen WHERE specimen_id = "+self.specimenKey+" AND ship="+self.ship+
+        sql = ("SELECT comments FROM " + self.schema + ".specimen WHERE specimen_id = "+self.specimenKey+" AND ship="+self.ship+
         " AND survey="+self.survey+" AND event_id="+self.activeHaul)
         query = self.db.dbQuery(sql)
         val, = query.first()
@@ -811,12 +812,12 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
             self.message.setMessage(self.errorIcons[0],self.errorSounds[0], "Are you sure you want to permanently delete this record, "+self.firstName+"?", 'choice')
             if self.message.exec():
                 # delete from the measurements table
-                sql = ("DELETE FROM measurements WHERE ship="+self.ship+
+                sql = ("DELETE FROM " + self.schema + ".measurements WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+str(self.selRecord[0])) # delete away
                 self.db.dbExec(sql)
 
                 # delete from the specimen table
-                sql = ("DELETE FROM specimen WHERE ship="+self.ship+
+                sql = ("DELETE FROM " + self.schema + ".specimen WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+str(self.selRecord[0])) # delete away
                 self.db.dbExec(sql)
                 self.comment = ''
@@ -926,7 +927,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                 p=p+s+' '
 
             # insert comment into specimen
-            sql = ("UPDATE specimen SET comments='"+p+ "' WHERE  ship="+self.ship+
+            sql = ("UPDATE " + self.schema + ".specimen SET comments='"+p+ "' WHERE  ship="+self.ship+
                 " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+self.specimenKey)
             self.db.dbExec(sql)
 

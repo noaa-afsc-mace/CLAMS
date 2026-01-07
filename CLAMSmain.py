@@ -519,7 +519,7 @@ class CLAMSMain(QMainWindow, ui_CLAMSMain.Ui_clamsMain):
                 gear, = query.first()
 
                 #  determine gear type
-                sql = "SELECT gear_type FROM gear WHERE gear='" + gear + "'"
+                sql = "SELECT gear_type FROM " + self.schema + ".gear WHERE gear='" + gear + "'"
                 query = self.db.dbQuery(sql)
                 gearType, = query.first()
 
@@ -540,7 +540,7 @@ class CLAMSMain(QMainWindow, ui_CLAMSMain.Ui_clamsMain):
                 self.activeEvent = event
 
                 #  update the active event in the database
-                sql = ("UPDATE application_configuration SET parameter_value=" + self.activeEvent +
+                sql = ("UPDATE " + self.schema + ".application_configuration SET parameter_value=" + self.activeEvent +
                         " WHERE parameter='ActiveEvent'")
                 self.db.dbExec(sql)
             else:

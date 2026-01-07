@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class VialNumberDuplicate(QObject):
 
-    def __init__(self, db, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode,  subcategory='None'):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -63,9 +63,10 @@ class VialNumberDuplicate(QObject):
 
         #  store a reference to our db object
         self.db = db
+        self.schema = schema
 
         #  get the active survey ID
-        sql = "SELECT parameter_value FROM application_configuration WHERE parameter = 'ActiveSurvey'"
+        sql = "SELECT parameter_value FROM " + schema + ".application_configuration WHERE parameter = 'ActiveSurvey'"
         query = self.db.dbQuery(sql)
         self.survey, = query.first()
 
@@ -97,7 +98,7 @@ class VialNumberDuplicate(QObject):
         '''
 
         # Check whether vial number is unique
-        sql = ("SELECT device_id FROM measurements WHERE measurement_type ='vial_number' " +
+        sql = ("SELECT device_id FROM " + self.schema + ".measurements WHERE measurement_type ='vial_number' " +
                 "AND measurement_value =" + currentValue + " AND survey =" + self.survey)
         query = self.db.dbQuery(sql)
         val, = query.first()
