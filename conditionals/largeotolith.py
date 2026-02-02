@@ -32,9 +32,8 @@
         Melina Shak <melina.shak@noaa.gov>
 """
 import unittest
-
+from unittest.mock import Mock
 from PyQt6.QtCore import *
-
 
 class LargeOtolith(QObject):
 
@@ -79,7 +78,9 @@ class LargeOtolith(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this validation checks if the measured length is a large length
             for this species+subcategory and then lets you know an otolith is needed.
@@ -92,7 +93,8 @@ class LargeOtolith(QObject):
 
         '''
 
-        length = values[measurements.index('standard_length_mm')]
+        lengthIndex = [i for i, s in enumerate(measurements) if "length" in s]
+        length = values[lengthIndex[0]]
         # check if the length is larger than the species 'largeLength', if yes, Otolith barcode is mandatory
         if length is not None and float(length) > self.largeLength:
             length=float(length)
@@ -102,3 +104,36 @@ class LargeOtolith(QObject):
                 pass
         return result
        
+'''
+The conditionalTest class enables testing of conditionals by creating a database
+connection, creating an instance of the conditional object, and then executing its
+evaluate method.
+
+This class will need to be customized a bit for each individual validation.
+'''
+
+class conditionalTest(unittest.TestCase):
+    query = Mock()
+    query.first.return_value = [149]
+
+    db = Mock()
+    db.dbQuery.return_value = query
+
+    schema = None
+    speciesCode = None
+
+    anchovyMeasurements = ['standard_length_mm', 'weight_g', 'dna_barcode', 'alpha_barcode']
+    mackerelMeasurements = ['fork_length_mm', 'weight_g', 'alpha_barcode']
+
+    results = [[True, True], [True, False], [True, False], [True, False]]
+
+    def largeAnchovy(self):
+        largeOtolith = LargeOtolith(self.db, self.schema, self.speciesCode)
+        values = ['150', '14', 'asdf', 'asdf']
+
+        ok = largeOtolith.evaluate(self.anchovyMeasurements, values, self.results)
+        self.assertEqual([[True, True], [True, False], [True, False], [True, False]], ok)
+
+if __name__ == '__main__':
+    unittest.main()
+
