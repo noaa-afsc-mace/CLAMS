@@ -75,34 +75,45 @@ class devicesDlg(BaseTableDlg, ui_DevicesDlg.Ui_DevicesDlg):
     def duplicate(self):
         currDeviceId = self.table.item(self.currentRow, 0).text()
 
-        # Get new ID logic
-        sql = f'SELECT MAX(device_id) FROM {self.schema}.devices'
-        query = self.db.dbQuery(sql)
-        max_id = query.first()[0]
-        # Handle case where table is empty
-        newId = (int(max_id) + 1) if max_id is not None else 1
+        try:
+            self.db.startTransaction()
 
-        # Query devices table and duplicate
-        sql = (f"SELECT device_name, model, serial_number, description, active, device_interface "
-               f"FROM {self.schema}.devices WHERE device_id={currDeviceId}")
-        query = self.db.dbQuery(sql)
-        device_name, model, serial_number, description, active, device_interface = query.first()
+            # Get new ID logic
+            sql = f'SELECT MAX(device_id) FROM {self.schema}.devices'
+            query = self.db.dbQuery(sql)
+            max_id = query.first()[0]
+            # Handle case where table is empty
+            newId = (int(max_id) + 1) if max_id is not None else 1
 
-        sql = (f"INSERT INTO {self.schema}.devices "
-               f"(device_id, device_name, model, serial_number, description, active, device_interface) "
-               f"VALUES ({newId}, '{device_name}', '{model}', '{serial_number}', "
-               f"'{description}', {active}, '{device_interface}')")
-        self.db.dbExec(sql)
+            # Query devices table and duplicate
+            sql = (f"SELECT device_name, model, serial_number, description, active, device_interface "
+                f"FROM {self.schema}.devices WHERE device_id={currDeviceId}")
+            query = self.db.dbQuery(sql)
+            device_name, model, serial_number, description, active, device_interface = query.first()
 
-        # Query device_configuration table and duplicate all entries
-        sql = (f"SELECT device_parameter, parameter_value "
-               f"FROM {self.schema}.device_configuration WHERE device_id={currDeviceId}")
-        query = self.db.dbQuery(sql)
+            prep = self.db.prepare(f"INSERT INTO {self.schema}.devices "
+                "(device_id, device_name, model, serial_number, description, active, device_interface) VALUES "
+                "(:id, :device_name, :model, :serial_number, :description, :active, :device_interface)")
+            
+            data = {':id': newId, ':device_name': device_name + '_copy', ':model': model, 
+                    ':serial_number': serial_number, ':description': description, 
+                    ':active': active, ':device_interface': device_interface}
+            self.db.dbExecPrepared(prep, data)
 
-        for device_parameter, parameter_value in query:
-            sql = (f"INSERT INTO {self.schema}.device_configuration "
-                   f"(device_id, device_parameter, parameter_value) "
-                   f"VALUES ({newId}, '{device_parameter}', '{parameter_value}')")
-            self.db.dbExec(sql)
+            # Query device_configuration table and duplicate all entries
+            sql = (f"SELECT device_parameter, parameter_value "
+                f"FROM {self.schema}.device_configuration WHERE device_id={currDeviceId}")
+            query = self.db.dbQuery(sql)
 
-        self.populate_table()
+            for device_parameter, parameter_value in query:
+                prep = self.db.prepare(f"INSERT INTO {self.schema}.device_configuration "
+                                    f"(device_id, device_parameter, parameter_value) "
+                                    f"VALUES (:id, :device_parameter, :parameter_value)")
+                data = {':id': newId, ':device_parameter': device_parameter, ':parameter_value': parameter_value}
+                self.db.dbExecPrepared(prep, data)
+            
+            self.db.commit()
+            self.populate_table()
+        except Exception:
+            self.db.rollback()
+            raise

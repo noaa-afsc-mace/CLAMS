@@ -64,6 +64,11 @@ class editDeviceConfig(BaseEditDlg, ui_EditDeviceConfig.Ui_EditDeviceConfig):
             self.deviceIdLabel.setText(str(self.deviceId))
             self.deviceParamsCB.setCurrentIndex(-1)
             self.paramValLabel.setText('')
+
+        if ('Update' in self.editBtn.text()):
+            self.deviceParamsCB.setDisabled(True)
+        else:
+            self.deviceParamsCB.setDisabled(False)
     
     def validate_fields(self):
         if 'Add' in self.editBtn.text():
