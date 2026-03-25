@@ -25,6 +25,9 @@ class devicesDlg(BaseTableDlg, ui_DevicesDlg.Ui_DevicesDlg):
         self.setup_base(self.devicesTable, self.dialog)
         self.deviceConfigBtn.clicked.connect(self.openDeviceConfig)
 
+        # Hookup duplicate button
+        self.duplicateBtn.clicked.connect(self.duplicate)
+
     # --- Implement the Hooks ---
     def setCurrWorkstation(self, id):
         self.workstationId = id
@@ -63,7 +66,43 @@ class devicesDlg(BaseTableDlg, ui_DevicesDlg.Ui_DevicesDlg):
         device_id = self.table.item(self.currentRow, 0).text()
         self.devicesConfigDlg.setDeviceId(device_id)
         self.deviceConfigBtn.setEnabled(has_selection)
+        self.duplicateBtn.setEnabled(has_selection)
     
     def openDeviceConfig(self):
         self.devicesConfigDlg.populate_table()
         self.devicesConfigDlg.exec()
+
+    def duplicate(self):
+        currDeviceId = self.table.item(self.currentRow, 0).text()
+
+        # Get new ID logic
+        sql = f'SELECT MAX(device_id) FROM {self.schema}.devices'
+        query = self.db.dbQuery(sql)
+        max_id = query.first()[0]
+        # Handle case where table is empty
+        newId = (int(max_id) + 1) if max_id is not None else 1
+
+        # Query devices table and duplicate
+        sql = (f"SELECT device_name, model, serial_number, description, active, device_interface "
+               f"FROM {self.schema}.devices WHERE device_id={currDeviceId}")
+        query = self.db.dbQuery(sql)
+        device_name, model, serial_number, description, active, device_interface = query.first()
+
+        sql = (f"INSERT INTO {self.schema}.devices "
+               f"(device_id, device_name, model, serial_number, description, active, device_interface) "
+               f"VALUES ({newId}, '{device_name}', '{model}', '{serial_number}', "
+               f"'{description}', {active}, '{device_interface}')")
+        self.db.dbExec(sql)
+
+        # Query device_configuration table and duplicate all entries
+        sql = (f"SELECT device_parameter, parameter_value "
+               f"FROM {self.schema}.device_configuration WHERE device_id={currDeviceId}")
+        query = self.db.dbQuery(sql)
+
+        for device_parameter, parameter_value in query:
+            sql = (f"INSERT INTO {self.schema}.device_configuration "
+                   f"(device_id, device_parameter, parameter_value) "
+                   f"VALUES ({newId}, '{device_parameter}', '{parameter_value}')")
+            self.db.dbExec(sql)
+
+        self.populate_table()

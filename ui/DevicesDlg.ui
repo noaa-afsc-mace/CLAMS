@@ -106,6 +106,22 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="duplicateBtn">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="font">
+         <font>
+          <family>Arial Black</family>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Duplicate</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="editBtn">
         <property name="enabled">
          <bool>false</bool>
