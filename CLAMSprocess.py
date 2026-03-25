@@ -941,6 +941,77 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                             self.returnFlag=True
                             return
 
+            # validation #4 - when submix (SubMix1, species_code=100003) is used as a parent
+            # sample type, check that the sum of count basket weights is within the
+            # SubSampleCheckThreshold compared to the Animalia species measure basket weights
+
+            #  get the SubMix1 sample id for this partition
+            sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+                    " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+                    " AND partition='" + partition + "' AND species_code=100003")
+            query = self.db.dbQuery(sql)
+            submix1Id, = query.first()
+
+            if submix1Id is not None:
+
+                #  get the sum of Count basket weights for species samples with SubMix1 as parent
+                sql = ("SELECT SUM(b.weight) FROM " + self.schema + ".baskets b, " +
+                        self.schema + ".samples s WHERE b.sample_id=s.sample_id AND " +
+                        "b.ship=s.ship AND b.survey=s.survey AND b.event_id=s.event_id " +
+                        "AND s.ship=" + self.ship + " AND s.survey=" + self.survey +
+                        " AND s.event_id=" + self.activeHaul + " AND s.parent_sample=" +
+                        submix1Id + " AND b.basket_type='Count'")
+                query = self.db.dbQuery(sql)
+                countBasketWeight, = query.first()
+                countBasketWeight = float(countBasketWeight) if countBasketWeight else 0.0
+
+                #  get the sum of Measure basket weights for Animalia species with SubMix1 as parent
+                sql = ("SELECT SUM(b.weight) FROM " + self.schema + ".baskets b, " +
+                        self.schema + ".samples s, " + self.schema + ".species sp WHERE " +
+                        "b.sample_id=s.sample_id AND b.ship=s.ship AND b.survey=s.survey AND " +
+                        "b.event_id=s.event_id AND s.species_code=sp.species_code AND " +
+                        "s.ship=" + self.ship + " AND s.survey=" + self.survey +
+                        " AND s.event_id=" + self.activeHaul + " AND s.parent_sample=" +
+                        submix1Id + " AND b.basket_type='Measure' AND " +
+                        "LOWER(sp.scientific_name) LIKE '%animalia%'")
+                query = self.db.dbQuery(sql)
+                animaliaWeight, = query.first()
+                animaliaWeight = float(animaliaWeight) if animaliaWeight else 0.0
+
+                #  if there's Animalia measure basket data, check if count baskets are within threshold
+                if animaliaWeight > 0:
+                    deviation = abs(animaliaWeight - countBasketWeight) / animaliaWeight * 100.
+
+                    if deviation > float(self.settings['SubSampleCheckThreshold']):
+                        self.message.setMessage(self.errorIcons[1], self.errorSounds[1],
+                                "The weight of the SubMix1 count baskets (" +
+                                str(round(countBasketWeight, 2)) + " kg) is " +
+                                str(round(deviation, 1)) + "% different from the Animalia " +
+                                "species measure basket weight (" +
+                                str(round(animaliaWeight, 2)) + " kg) in the " + partition +
+                                ". Do you want to return to sampling?", 'choice')
+                        if self.message.exec():
+                            self.returnFlag = True
+                            return
+                        else:
+                            #  Ignore the problem - insert into override table
+                            self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
+                                    "OK. This exception has been logged in the overrides table.",
+                                    'info')
+                            self.message.exec()
+
+                            #  insert into overrides table
+                            overrideDesc = ("'Submix count basket weight mismatch. " +
+                                    "Count basket weight=" + str(round(countBasketWeight, 2)) +
+                                    " Animalia measure weight=" + str(round(animaliaWeight, 2)) + "'")
+                            sql = ("INSERT INTO overrides (ship,survey,event_id,record_id,table_name," +
+                                    "scientist,description) VALUES (" + self.ship + ", " + self.survey +
+                                    "," + self.activeHaul + "," + submix1Id + ",'baskets','" +
+                                    self.scientist + "'," + overrideDesc + ")")
+                            self.db.dbExec(sql)
+
+                            self.returnFlag = False
+
 
     def checkWindowLocation(self, position, size, padding=[5, 25]):
         '''
