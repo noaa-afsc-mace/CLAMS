@@ -1026,8 +1026,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                     if not param:
                         # get avg of the data between the TD and the HB times in event_stream_data
                         avg_sql = ("SELECT AVG(CAST(measurement_value as float)) FROM " + self.schema
-                                   + ".event_stream_data WHERE measurement_type='" + dev_name
-                                   + "' AND time_stamp BETWEEN '" + td_time + "' AND '" + hb_time + "'")
+                                    + ".event_stream_data WHERE measurement_type='" + dev_name
+                                    + "' AND time_stamp BETWEEN '" + td_time + "' AND '" + hb_time + "'")
+                     
                         try:
                             avg_query = self.db.dbQuery(avg_sql)
                             dev_avg, = avg_query.first()
@@ -1044,4 +1045,36 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                 else:
                     msg = "Missing EQ or HB for this tow, no averages can be calculated"
                     self.message.setMessage(self.errorIcons[0], self.errorSounds[0], msg, 'warning')
+            else:
+                timestamps = { 'EQ': td_time, 'HB': hb_time }
+                for key, value in timestamps.items():
+                    event_param = dev_name + key
+                    # check if the parameter already exists
+                    exists_sql = ("SELECT event_parameter FROM " + self.schema +
+                        ".event_data WHERE ship = " + self.ship + " AND survey = " + self.survey +
+                        " AND event_id = " + self.activeEvent + " AND partition = 'MainTrawl' "
+                        "AND event_parameter = '" + event_param + "'")
+                    exists_query = self.db.dbQuery(exists_sql)
+                    param, = exists_query.first()
+
+                if not param:
+                    # get avg of the data between the TD and the HB times in event_stream_data
+                    sql = ("SELECT CAST(measurement_value as float) FROM " + self.schema
+                        + ".event_stream_data WHERE measurement_type='" + dev_name
+                        + "' ORDER BY ABS(EXTRACT(EPOCH FROM time_stamp - '" + value + "')) LIMIT 1")
+                    
+                    try:
+                        query = self.db.dbQuery(sql)
+                        queryVal, = query.first()
+                        if queryVal:
+                            # insert parameter into event_data
+                            insert_sql = ("INSERT INTO " + self.schema +
+                                ".event_data (ship, survey, event_id, partition, event_parameter, "
+                                "parameter_value) VALUES (" + self.ship + ", " + self.survey + ", "
+                                + self.activeEvent + ", 'MainTrawl', '" + event_param + "', '"
+                                + str(queryVal) + "')")
+                            self.db.dbQuery(insert_sql)
+                    except:
+                        pass
+
 
