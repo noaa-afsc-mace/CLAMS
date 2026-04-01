@@ -1052,24 +1052,24 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         # add latitude and longitude closest in time to EQ and HB events
         for time_val, suffix in [(td_time, 'EQ'), (hb_time, 'HB')]:
             if time_val is not None:
-                for param_prefix in ['Latitude','Longitude']:
-                        event_param = param_prefix + suffix
-                        # check if the parameter already exists
-                        exists_sql = ("SELECT event_parameter FROM " + self.schema +
-                                      ".event_data WHERE ship = " + self.ship + " AND survey = " + self.survey +
-                                      " AND event_id = " + self.activeEvent + " AND partition = 'MainTrawl' "
-                                      "AND event_parameter = '" + event_param + "'")
-                        exists_query = self.db.dbQuery(exists_sql)
-                        param, = exists_query.first()
+                for param_prefix in ['Latitude', 'Longitude']:
+                    event_param = param_prefix + suffix
+                    # check if the parameter already exists
+                    exists_sql = ("SELECT event_parameter FROM " + self.schema +
+                                  ".event_data WHERE ship = " + self.ship + " AND survey = " + self.survey +
+                                  " AND event_id = " + self.activeEvent + " AND partition = 'MainTrawl' "
+                                  "AND event_parameter = '" + event_param + "'")
+                    exists_query = self.db.dbQuery(exists_sql)
+                    param, = exists_query.first()
 
-                        if not param:
-                            # get the value closest in time from event_stream_data
-                            stream_vals = self.get_event_stream_vals(time_val, [param_prefix])
-                            if stream_vals[0]:
-                                insert_sql = ("INSERT INTO " + self.schema +
-                                              ".event_data (ship, survey, event_id, partition, event_parameter, "
-                                              "parameter_value) VALUES (" + self.ship + ", " + self.survey + ", "
-                                              + self.activeEvent + ", 'MainTrawl', '" + event_param + "', '"
-                                              + str(stream_vals[0]) + "')")
-                                self.db.dbQuery(insert_sql)
+                    if not param:
+                        # get the value closest in time from event_stream_data
+                        stream_vals = self.get_event_stream_vals(time_val, [param_prefix])
+                        if stream_vals[0]:
+                            insert_sql = ("INSERT INTO " + self.schema +
+                                          ".event_data (ship, survey, event_id, partition, event_parameter, "
+                                          "parameter_value) VALUES (" + self.ship + ", " + self.survey + ", "
+                                          + self.activeEvent + ", 'MainTrawl', '" + event_param + "', '"
+                                          + str(stream_vals[0]) + "')")
+                            self.db.dbQuery(insert_sql)
 
