@@ -89,7 +89,7 @@ class DNABoundaries(QObject):
         #  Look up the haul-back latitude of the current event
         sql = ("SELECT parameter_value FROM " + schema + ".event_data WHERE ship=" +
                self.ship + " AND survey=" + self.survey + " AND event_id=" +
-               self.activeHaul + " AND event_parameter='LatitudeHB'")
+               self.activeHaul + " AND event_parameter='LatitudeEQ'")
         query = db.dbQuery(sql)
         latitude, = query.first()
 
@@ -133,13 +133,13 @@ class DNABoundaries(QObject):
                " (SELECT event_id FROM " + self.schema + ".event_data" +
                " WHERE ship=" + self.ship +
                " AND survey=" + self.survey +
-               " AND event_parameter='LatitudeHB'" +
+               " AND event_parameter='LatitudeEQ'" +
                " AND cast(parameter_value AS float) >= " + str(self.lowerBound) +
                " AND cast(parameter_value AS float) < " + str(self.upperBound) + ")")
         query = self.db.dbQuery(sql)
         dnaCount, = query.first()
 
-        if dnaCount is not None and int(dnaCount) >= 50:
+        if values[measurements.index('dna_barcode')] is None and dnaCount is not None and int(dnaCount) >= 1:
             try:
                 result[measurements.index('dna_barcode')] = [False, False]
             except (ValueError, IndexError):

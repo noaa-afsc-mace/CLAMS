@@ -108,7 +108,6 @@ class SmallOtolithMax5(QObject):
             # check if the length is larger than the species 'largeLength', if yes, Otolith barcode is mandatory
             if length < self.smallLength and smallOtoCount >= 5:
                 try:
-                    print('asdf' )
                     result[measurements.index('alpha_barcode')]=[False, False]
                 except:
                     pass
