@@ -1363,6 +1363,31 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         self.returnFlag=False
 
+# --- BEGIN NEW ANIMALIA/PRESENT VALIDATION ---
+        # Check if there is any sample with sample_type = 'Present'
+        sql = ("SELECT COUNT(sample_id) FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+               " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+               " AND partition='" + self.activePartition + "' AND sample_type='Present'")
+        query = self.db.dbQuery(sql)
+        presentCount, = query.first()
+        
+        if presentCount and int(presentCount) > 0:
+            # We have a 'Present' sample, now check if Animalia (202423) exists in this partition
+            sql = ("SELECT COUNT(sample_id) FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+                   " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+                   " AND partition='" + self.activePartition + "' AND species_code=202423 AND sample_type='Species'")
+            query = self.db.dbQuery(sql)
+            animaliaCount, = query.first()
+            
+            if not animaliaCount or int(animaliaCount) == 0:
+                self.message.setMessage(self.errorIcons[2], self.errorSounds[1],
+                        self.firstName + ", there is a sample marked as 'Present' but no 'Animalia' species was found. " +
+                        "Please add the Animalia species and weigh group before continuing.", 'info')
+                self.message.exec()
+                self.returnFlag = True
+                return
+        # --- END NEW ANIMALIA/PRESENT VALIDATION ---
+
         #  check if all of the samples have at least one basket. First get the samples
         sql = ("SELECT species.common_name, samples.sample_id, samples.species_code, " +
                 "samples.subcategory FROM " + self.schema + ".samples, " + self.schema + ".species WHERE " +
