@@ -1042,7 +1042,12 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                     btn.setStyleSheet("background-color: gray")
                 if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
                     self.forcing[i] = '1'
-                    btn.setStyleSheet("background-color: red")
+                    #Only turn the button red if a measurement hasn't been taken yet.
+                    # Otherwise, ensure it stays green.
+                    if self.values[i] is None:
+                        btn.setStyleSheet("background-color: red")
+                    else:
+                        btn.setStyleSheet("background-color: green")
 
 
     def getNext(self, skipChecks=False):
