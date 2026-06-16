@@ -1920,9 +1920,15 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             code = str(self.survey) + str(self.ship) + str(self.activeHaul).zfill(3) + str(self.specimenKey)
 
             lengthType = str(self.lengthTypeBox.currentText())
-            lw_sql = (f"SELECT {lengthType}, organism_weight FROM {self.schema}.v_specimen_measurements "
-                      f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.activeHaul} "
-                      f"AND specimen_id={self.specimenKey}")
+            if 'nwfsc' in self.settings['OrganizationName'].lower():
+                lw_sql = (f"SELECT {lengthType}, organism_weight FROM {self.schema}.v_specimen_measurements "
+                          f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.activeHaul} "
+                          f"AND specimen_id={self.specimenKey}")
+
+            else:
+                lw_sql = (f"SELECT {lengthType}, weight_g FROM {self.schema}.v_specimen_measurements "
+                          f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.activeHaul} "
+                          f"AND specimen_id={self.specimenKey}")
             lw_query = self.db.dbQuery(lw_sql)
             length, weight = lw_query.first()
             self.printer.print_label(self.protocol, self.activeSpcName, self.activeSpcCode, self.activeHaul,
