@@ -93,7 +93,10 @@ class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
                         self.G_Btn,self.H_Btn,self.I_Btn,self.J_Btn,self.K_Btn,self.L_Btn,
                         self.M_Btn,self.N_Btn,self.O_Btn,self.P_Btn,self.Q_Btn,self.R_Btn,
                         self.S_Btn,self.T_Btn,self.U_Btn,self.V_Btn,self.W_Btn,self.X_Btn,
-                        self.Y_Btn,self.Z_Btn]
+                        self.Y_Btn,self.Z_Btn,
+                        self.num0_Btn, self.num1_Btn, self.num2_Btn, self.num3_Btn, 
+                        self.num4_Btn, self.num5_Btn, self.num6_Btn, self.num7_Btn, 
+                        self.num8_Btn, self.num9_Btn]
         #  connect the keyboard key signals
         for btn in self.digitBtns:
             btn.clicked.connect(self.getDigit)
