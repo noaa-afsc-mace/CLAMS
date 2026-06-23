@@ -1661,26 +1661,45 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             # change the background color if the species is in the protocol map
             if 'DisplayProtoSp' in self.settings:
                 if self.settings['DisplayProtoSp'] == 'True':
-                    # check if species is in the protocol_map table as Active
-                    proto_sql = ("SELECT protocol_name, species_code FROM " +
+                    # FIXED: We grab the 'active' column but do not filter in SQL to prevent silent crashes
+                    proto_sql = ("SELECT protocol_name, species_code, active FROM " +
                                  self.schema + ".protocol_map WHERE species_code=" + spCode)
                     proto_query = self.db.dbQuery(proto_sql)
                     sp_protos = ['BagNTag']
                     # group collections to highlight in green
                     green_protos = ['Eulachon', 'Salmon','Hake','Pacific Sardine','Mackerels',
                                  'Northern Anchovy','Small_Pelagics']
-                    for protocol, sp_code in proto_query:
+                    
+                    is_green = False
+                    is_yellow = False
+                    
+                    for row in proto_query:
+                        protocol = row[0]
+                        
+                        # Python-level check to bypass database syntax issues
+                        if len(row) >= 3:
+                            active_flag = str(row[2]).strip().lower()
+                            # If the database says it's 0, false, or empty, skip it entirely!
+                            if active_flag in ['0', 'false', 'none', '']:
+                                continue
+                        
                         # Add the protocol to our list for the loop
                         sp_protos.append(protocol)
                         
-                        # for protocols in group collection, highlight them in green
-                        if (protocol in green_protos):
-                            # Green
-                            self.speciesList.item(nSamples, 0).setBackground(QColor(127, 255, 212))
-                            break
+                        # Check if any protocol in the list matches a green group collection
+                        if protocol in green_protos:
+                            is_green = True
                         else:
-                            # Yellow
-                            self.speciesList.item(nSamples, 0).setBackground(QColor(255, 222, 128))
+                            is_yellow = True
+                            
+                    # Apply the background color after collecting ALL active protocols
+                    if is_green:
+                        # Green
+                        self.speciesList.item(nSamples, 0).setBackground(QColor(127, 255, 212))
+                    elif is_yellow:
+                        # Yellow
+                        self.speciesList.item(nSamples, 0).setBackground(QColor(255, 222, 128))
+                        
                     self.speciesProtos[spCode] = sp_protos
 
             nSamples += 1
