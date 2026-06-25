@@ -697,9 +697,11 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                         self.message.exec()
                         return
                     if (not val):
-                        self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You did not enter a value", 'info')
-                        self.message.exec()
-                        return
+                        self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "You did not enter a value", 'choice')
+                        if self.message.exec():
+                            self.editFieldFlag = True
+                        else:
+                            return
                     self.manualFlag = False
 
             elif not (self.serialValue == None):
@@ -1035,7 +1037,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             else:
                 # overwrite record - UPDATE
-                sql =("UPDATE " + self.schema + ".measurements SET measurement_value ='" + self.values[i] + "' WHERE  ship="+
+                val = self.values[i]
+                if (val == None):
+                    val = ''
+                sql =("UPDATE " + self.schema + ".measurements SET measurement_value ='" + val + "' WHERE  ship="+
                         self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
                         " AND sample_id="+self.activeSample+" AND specimen_id = " +self.specimenKey +
                         " AND measurement_type = '" + measure_type+"'")
