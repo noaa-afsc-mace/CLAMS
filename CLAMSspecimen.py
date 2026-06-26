@@ -55,6 +55,7 @@ import messagedlg
 import collectionsdlg
 import ZebraLabelPrinter
 import FEATZebraPrinter
+import deletedlg
 
 
 class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
@@ -1682,23 +1683,41 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.message.exec()
             return
 
-        #  verify that the user wants to delete the specimen
-        self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
-                                " specimen " + self.specimenKey + ", " + self.firstName + "? ", 'choice')
-        if self.message.exec():
-            #  yes - delete the specimen
-            sql = ("DELETE FROM " + self.schema + ".measurements WHERE ship="+self.ship+
-                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = " + self.specimenKey)
-            self.db.dbExec(sql)
-            sql = ("DELETE FROM " + self.schema + ".specimen WHERE ship="+self.ship+
-                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+self.specimenKey)
-            self.db.dbExec(sql)
+        # Get available measurements for the specimen
+        measurements = ["Entire Specimen"]
+        sql = (f"SELECT DISTINCT measurement_type FROM {self.schema}.measurements "
+               f"WHERE specimen_id = {self.specimenKey} AND ship={self.ship} "
+               f"AND survey={self.survey} AND event_id={self.activeHaul}")
+        query = self.db.dbQuery(sql)
+        for measurement_type, in query:
+            measurements.append(measurement_type)
 
-            #  update the view
-            self.updateMeasureView()
-            self.specimenLabel.setText('')
-            #  reset for the next sample - skip the checks since we're deleting this sample
-            self.getNext(skipChecks=True)
+        delete_dialog = deletedlg.DeleteDlg(self)
+        delete_dialog.set_delete_options(measurements)
+
+        if delete_dialog.exec():
+            option = delete_dialog.get_selected_option()
+            if option == "Entire Specimen":
+                # Delete the entire specimen
+                sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                       f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                self.db.dbExec(sql)
+                sql = (f"DELETE FROM {self.schema}.specimen WHERE specimen_id = {self.specimenKey} "
+                       f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                self.db.dbExec(sql)
+
+                #  update the view
+                self.updateMeasureView()
+                self.specimenLabel.setText('')
+                #  reset for the next sample - skip the checks since we're deleting this sample
+                self.getNext(skipChecks=True)
+            else:
+                # Delete selected measurement
+                sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                       f"AND measurement_type = '{option}' AND ship={self.ship} "
+                       f"AND survey={self.survey} AND event_id={self.activeHaul}")
+                self.db.dbExec(sql)
+                self.updateMeasureView()
 
 
     def resetColors(self):
@@ -2155,7 +2174,3 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 newSize.setHeight(screenGeometry.height() - newPosition.y() - padding[1])
 
         return [newPosition, newSize]
-
-
-
-
