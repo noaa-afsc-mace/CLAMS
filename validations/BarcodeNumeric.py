@@ -87,8 +87,7 @@ class BarcodeNumeric(QObject):
         '''
 
         try:
-            if currentValue:
-                int(currentValue)
+            int(currentValue)
         except:
             #  barcode failed - not a number
             result = (False, 'The barcode scan was not a number. Please re-scan.')
