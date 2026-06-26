@@ -1699,32 +1699,38 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         delete_dialog.set_delete_options(measurements)
 
         if delete_dialog.exec():
-            option = delete_dialog.get_selected_option()
+            option = delete_dialog.get_selected_option()    
             if option == "Entire Specimen":
-                # Delete the entire specimen
-                sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
-                       f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
-                self.db.dbExec(sql)
-                sql = (f"DELETE FROM {self.schema}.specimen WHERE specimen_id = {self.specimenKey} "
-                       f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
-                self.db.dbExec(sql)
+                self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
+                                " specimen " + self.specimenKey + ", " + self.firstName + "? ", 'choice')
+                if self.message.exec():
+                    # Delete the entire specimen
+                    sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                        f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
+                    sql = (f"DELETE FROM {self.schema}.specimen WHERE specimen_id = {self.specimenKey} "
+                        f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
 
-                #  update the view
-                self.updateMeasureView()
-                self.specimenLabel.setText('')
-                #  reset for the next sample - skip the checks since we're deleting this sample
-                self.getNext(skipChecks=True)
+                    #  update the view
+                    self.updateMeasureView()
+                    self.specimenLabel.setText('')
+                    #  reset for the next sample - skip the checks since we're deleting this sample
+                    self.getNext(skipChecks=True)
             else:
-                # Delete selected measurement
-                sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
-                       f"AND measurement_type = '{option}' AND ship={self.ship} "
-                       f"AND survey={self.survey} AND event_id={self.activeHaul}")
-                self.db.dbExec(sql)
-                # After deleting a measurement, we need to reload the specimen data
-                # to reflect the change and avoid state conflicts.
-                self.selModel.clearSelection()
-                self.updateMeasureView()
-
+                self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
+                                " measurement: " + option + " for specimen: " + self.specimenKey + ", " + 
+                                self.firstName + "? ", 'choice')
+                if self.message.exec():
+                    # Delete selected measurement
+                    sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                        f"AND measurement_type = '{option}' AND ship={self.ship} "
+                        f"AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
+                    # After deleting a measurement, we need to reload the specimen data
+                    # to reflect the change and avoid state conflicts.
+                    self.selModel.clearSelection()
+                    self.updateMeasureView()
 
     def resetColors(self):
         '''resetColors resets the button colors after a specimen has been taken, deleted, or is being edited
