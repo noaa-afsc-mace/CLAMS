@@ -1192,7 +1192,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                         "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                         "," + self.activeHaul + "," + self.specimenKey + ",'measurements','" +
-                        self.scientist + "','" + missing_measurements_text + "')")
+                        self.scientist + "','" + missing_measurements_text + "') "+
+                        "ON CONFLICT (ship, survey, event_id, record_id, table_name, scientist) " +
+                        "DO UPDATE SET description = EXCLUDED.description, time_stamp = statement_timestamp()")
                 self.db.dbExec(sql)
 
         # make the 'next' sound effect
@@ -1275,7 +1277,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         if (self.sqlLengthIndex != None):
             #  create the SQL string based on the current length type
             length_type = str(self.lengthTypeBox.currentText())
-            sqlStringEnd = ' AND ' + length_type + ' IS NOT NULL '
+            # sqlStringEnd = ' AND ' + length_type + ' IS NOT NULL '
+            sqlStringEnd = ' '
             #  insert the current length type
             self.sqlString[self.sqlLengthIndex] = length_type
         else:
@@ -1717,6 +1720,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                        f"AND measurement_type = '{option}' AND ship={self.ship} "
                        f"AND survey={self.survey} AND event_id={self.activeHaul}")
                 self.db.dbExec(sql)
+                # After deleting a measurement, we need to reload the specimen data
+                # to reflect the change and avoid state conflicts.
+                self.selModel.clearSelection()
                 self.updateMeasureView()
 
 
@@ -1786,14 +1792,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 content = True
         if content:
             #  there are missing measurements throw up a dialog
-            for i in range(len(self.measureType)):
+            '''for i in range(len(self.measureType)):
                 btn = self.buttons[i]
                 if (self.values[i] == None) and (self.forcing[i] == '1') and (btn.isEnabled()):
                     self.message.setMessage(self.errorIcons[0],self.errorSounds[0], "Dear "+self.firstName+", "+
                                         "Please finish up your current specimen before editing.",'info' )
                     self.message.exec()
                     self.selModel.clearSelection()
-                    return
+                    return'''
 
         #  set the specimen_id and update it on the GUI
         self.specimenKey = str(int(thisSpecimenKey))
