@@ -506,6 +506,45 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
 
         self.dataTable.resizeColumnsToContents()
 
+        # check if this event has been fully completed - defined as having BOTH NIW and NOD data.
+        if Events.NetInWater.name in self.button_order and Events.NetOnDeck.name in self.button_order:
+            self.recording = False
+            self.recordStream = False
+            self.doneBtn.setEnabled(True)
+            self.commentBtn.setEnabled(True)
+
+            QMessageBox.information(self, 'Kipaumbele!', "<font size=14>This haul appears to have been completed. " +
+                                    "You can only edit it. New time values must be within the original "
+                                    "time span of the event. " +
+                                    "No new stream data will be recorded.</font>", QMessageBox.StandardButton.Ok)
+        else:
+            # tow is incomplete - set recording to True as a baseline.
+            self.recording = True
+            self.commentBtn.setEnabled(True)
+
+            # should this be a live event
+            reply = QMessageBox.question(self, 'Achtung!', "<font size = 14>This haul was not completed. " +
+                                         "Is this event still taking place?</font>",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+            if reply == QMessageBox.StandardButton.Yes:
+                # determine what SCS logging rate we should use
+                if Events.EQ.name not in self.button_order:
+                    # EQ has not been pressed yet
+                    self.SCSLogInterval = self.streamSlowLogInterval
+                    self.fishingFlag = False
+                else:
+                    self.SCSLogInterval = self.streamEQHBLogInterval
+                    self.fishingFlag = True
+
+                # set the stream variable to True for a live reloaded tow
+                self.recordStream = True
+            else:
+                # not a live event - treat this as an edit after the fact
+                self.recordStream = False
+                self.recording = False
+
+        """
         if Events.NetOnDeck.name in self.button_order:
             self.recording = False
             self.doneBtn.setEnabled(True)
@@ -541,8 +580,9 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                                     "You can only edit it. New time values must be within the original "
                                     "time span of the event. " +
                                     "No new stream data will be recorded.</font>", QMessageBox.StandardButton.Ok)
+        """
         self.doneBtn.setEnabled(True)
-
+        
     def check_for_required_meta(self):
         """
 
@@ -782,6 +822,15 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
                         "VALUES (" + self.ship + "," + self.survey + "," + str(self.activeEvent) + "," +
                         self.deviceData[device_name]['id'] + ",'" + time + "','" + measurement +
                         "','" + data + "')")
+                ## todo: MAY NEED TO CONVERT TIMESTAMP EXPLICITLY - comment out sql above and use this instead
+                """
+                # insert into the database with explicit timestamp conversion
+                sql = ("INSERT INTO " + self.schema + ".event_stream_data (ship, survey, " +
+                        "event_id, device_id, time_stamp, measurement_type, measurement_value) " +
+                        "VALUES (" + self.ship + "," + self.survey + "," + str(self.activeEvent) + "," +
+                        self.deviceData[device_name]['id'] + ", to_timestamp('" + time + "', 'MMDDYYYY HH24:MI:SS.MS'), '" + 
+                        measurement + "','" + data + "')")
+                """
                 self.db.dbExec(sql)
                 wroteToDb = True
 
