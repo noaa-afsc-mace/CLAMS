@@ -870,7 +870,8 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         metadataFields = [member.value for member in metadlg.MetadataFields]
         formattedMeta = ", ".join([f"'{x}'" for x in metadataFields])
         sql = ("SELECT count(*) FROM " + self.schema + 
-                    ".event_data where event_id=" + str(self.activeEvent) + ' and ' +
+                    ".event_data where ship=" + self.ship + " and survey=" + self.survey +
+                    " and event_id=" + str(self.activeEvent) + ' and ' +
                     "event_parameter in (" + formattedMeta + ")")
         resuls = self.db.dbQuery(sql)
         count, = resuls.first()
@@ -883,7 +884,8 @@ class Event(QDialog, ui_CPSTrawlEvent.Ui_CPSTrawlEvent):
         gearFields = [member.value for member in metadlg.GearTypeFields]
         formattedGear = ", ".join([f"'{x}'" for x in gearFields])
         sql = ("SELECT count(*) FROM " + self.schema + 
-                    ".gear_accessory where event_id=" + str(self.activeEvent) +
+                    ".gear_accessory where ship=" + self.ship + " and survey=" + self.survey +
+                    " and event_id=" + str(self.activeEvent) +
                     " and gear_accessory in (" + formattedGear + ")")
         resuls = self.db.dbQuery(sql)
         count, = resuls.first()
