@@ -186,15 +186,15 @@ class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
 
         if self.chars == '':
             commonQuery = "SELECT species.common_name, species.species_code FROM " + self.schema + ".species ORDER BY species.common_name"
-            sciQuery = "SELECT species.scientific_name, species.species_code FROM " + self.schema + ".species WHERE species_code<999900 ORDER BY species.scientific_name"
+            sciQuery = "SELECT species.scientific_name, species.species_code FROM " + self.schema + ".species WHERE species_code<99999999 ORDER BY species.scientific_name"
         else:
             like_exp = "'%"+self.chars+"%'"
             commonQuery = ("SELECT species.common_name, species.species_code FROM " + self.schema + ".species WHERE (upper(species.common_name)" +
                 " LIKE upper(" + like_exp + ") OR CAST(species.species_code AS VARCHAR(50)) LIKE " + like_exp + 
-                ") AND species_code<999900 ORDER BY species.common_name")
+                ") AND species_code<99999999 ORDER BY species.common_name")
             sciQuery = ("SELECT species.scientific_name, species.species_code FROM " + self.schema + ".species WHERE (upper(species.scientific_name) "+
                 " LIKE upper(" + like_exp + ") OR CAST(species.species_code as VARCHAR(50)) LIKE " + like_exp + 
-                ") AND species_code<999900 ORDER BY species.scientific_name")
+                ") AND species_code<99999999 ORDER BY species.scientific_name")
 
         query = self.db.dbQuery(commonQuery)
         for commonName, code, in query:
@@ -274,7 +274,7 @@ class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
         if self.settings['CheckForPreviousOccurrence'].lower() == 'true':
             #  yes, check if we have seen this species before
             self.previous = 0
-            if int(self.activeSpcCode) < 99999:# not a mix
+            if self.activeSpcCode not in self.mixtureNames: # not a mix
                 sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE species_code="+
                         self.activeSpcCode+" AND subcategory='"+self.activeSpcSubcat+
                         "' AND LOWER(species_parameter)='previous_occurrence'")
@@ -357,7 +357,7 @@ class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
                 return
 
             # Only need to update the species data table with previous occurrence if it is not a mix
-            if int(self.activeSpcCode) < 99999:
+            if self.activeSpcCode not in self.mixtureNames:
                 if self.previous <= 0:
                     #  ask if we want to add this exotic species we've never encountered
                     self.message.setMessage(self.errorIcons[0],self.errorSounds[0], "We've never seen a "+
@@ -435,7 +435,7 @@ class cpsAddCatchSpcDlg(QDialog, ui_CPSAddCatchSpcDlg.Ui_CPSAddCatchSpcDlg):
                 "JOIN " + self.schema + ".samples ON species.species_code=samples.species_code WHERE " +
                 "(samples.event_id IN (" + hauls + ") AND (samples.survey = " +
                 self.survey+") AND species.species_code not in (100000, 100001) " +
-                "AND species.species_code<900000) GROUP BY species.common_name," +
+                "AND species.species_code<99999999) GROUP BY species.common_name," +
                 "species.species_code")
         spQuery = self.db.dbQuery(sql)
 
