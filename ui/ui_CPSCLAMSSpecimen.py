@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260_Deploy\CLAMS\ui\CLAMSSpecimen.ui'
+# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260_Deploy\CLAMS\ui\CPSCLAMSSpecimen.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #

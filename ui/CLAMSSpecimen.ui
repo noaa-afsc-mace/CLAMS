@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1087</width>
-    <height>706</height>
+    <height>732</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -712,7 +712,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="collectBtn">
+      <widget class="QPushButton" name="plotsView">
        <property name="minimumSize">
         <size>
          <width>0</width>
@@ -726,7 +726,7 @@
         </font>
        </property>
        <property name="text">
-        <string>Collect</string>
+        <string>Show Plots</string>
        </property>
       </widget>
      </item>
