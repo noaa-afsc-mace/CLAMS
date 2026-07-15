@@ -414,6 +414,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.commentBtn.clicked.connect(self.getComment)
         self.samplingMethodBox.activated[int].connect(self.editSamplingMethod)
         self.lengthTypeBox.activated[int].connect(self.lengthTypeChanged)
+        self.lwOnlyCheckBox.stateChanged.connect(self.toggleLWOnly)
+
 
         #  Connect up slots for protocol buttons
         for btn in self.buttons:
@@ -489,6 +491,39 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         # Use this to re-inforce the new length type policy
         QMessageBox.information(self, "Length Measurement Type", "<font size = 12>You should now measure " +lengthType)
 
+    def toggleLWOnly(self):
+        '''Overrides the protocol to only require Length and Weight when checked.'''
+        if not hasattr(self, 'measureType') or not self.measureType:
+            return 
+
+        checked = self.lwOnlyCheckBox.isChecked()
+
+        for i in self.iterator:
+            m_type = self.measureType[i].lower()
+            is_lw = (m_type in self.length_types) or ('length' in m_type) or ('weight' in m_type)
+
+            if checked:
+                if not is_lw:
+                    self.forcing[i] = '0'
+                else:
+                    self.forcing[i] = '1' # Guarantee length and weight are strictly required
+            else:
+                self.forcing[i] = self.origForcing[i]
+
+        # FIX FOR AUTO NEXT: 
+        if checked:
+            self.autoCheck.setEnabled(True)
+        else:
+            if '0' in self.forcing:
+                # Force the checkbox to uncheck before graying it out!
+                self.autoCheck.setChecked(False)
+                self.autoCheck.setEnabled(False)
+            else:
+                self.autoCheck.setEnabled(True)
+
+        # Trigger checkConditionals to immediately update button states
+        self.checkConditionals()
+        self.resetColors()
 
     def getSpecies(self):
         '''getSpecies is called when initializing the module and then when the new species button is pressed.
@@ -1260,13 +1295,17 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             # check conditionals
             self.checkConditionals()
+            
+            # FIX 1: Change the button color to green BEFORE moving on
+            self.buttons[i].setStyleSheet("background-color: green")
 
             if keepGoing:
                 self.moveOn(i)
+                
+        # If we were in edit mode, ensure the button still turns green
+        if self.editFieldFlag:
+            self.buttons[i].setStyleSheet("background-color: green")
         
-        #  change the button text to green
-        self.buttons[i].setStyleSheet("background-color: green")
-
 
     def moveOn(self, i):
         '''moveOn checks to make sure last measurement has been collected and then
@@ -1306,31 +1345,49 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 condObj = condObj(self.db, self.schema, self.activeSpcCode, self)
                 self.buttonEnable = condObj.evaluate(self.measureType,  self.values, self.buttonEnable)
 
+            # Check if LW Only override is active
+            lw_only_active = hasattr(self, 'lwOnlyCheckBox') and self.lwOnlyCheckBox.isChecked()
+
             for i in self.iterator:
                 btn = self.buttons[i]
-                # added by AB to re-enable buttons that already have measurement
+                
+                m_type = self.measureType[i].lower()
+                is_lw = (m_type in self.length_types) or ('length' in m_type) or ('weight' in m_type)
+
+                # Apply LW Only override before setting button state
+                if lw_only_active:
+                    if not is_lw:
+                        self.buttonEnable[i] = [False, False]
+                    else:
+                        # Force Length and Weight to bypass conditional scripts
+                        self.buttonEnable[i] = [True, True]
+                        self.forcing[i] = '1'
+
+                # Re-enable buttons that already have a measurement
                 if self.values[i] is not None:
                     self.buttonEnable[i][0] = True
 
                 btn.setEnabled(self.buttonEnable[i][0])
+                
+                # Determine and apply the correct background color cleanly
                 if not self.buttonEnable[i][0]:
                     btn.setStyleSheet("background-color: gray")
-
-                # added by AB to reset the button color if the measure is enabled and there is no value yet
-                elif self.buttonEnable[i][0] and self.values[i] is None:
+                    
+                elif self.values[i] is None:
+                    # Update forcing state if conditionals specify it should be forced
+                    if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
+                        if not lw_only_active or is_lw:
+                            self.forcing[i] = '1'
+                            
+                    # Color based on forcing state
                     if self.forcing[i] == '1':
                         btn.setStyleSheet("background-color: red")
                     else:
                         btn.setStyleSheet("background-color: yellow")
-
-                if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
-                    self.forcing[i] = '1'
-                    # Only turn the button red if a measurement hasn't been taken yet.
-                    # Otherwise, ensure it stays green.
-                    if self.values[i] is None:
-                        btn.setStyleSheet("background-color: red")
-                    else:
-                        btn.setStyleSheet("background-color: green")
+                        
+                else:
+                    # Measurement exists! No more stuck green colors.
+                    btn.setStyleSheet("background-color: green")
 
 
     def getNext(self, skipChecks=False):
@@ -1402,6 +1459,11 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.specimenLabel.setText('')
         #  reset the button colors
         self.resetColors()
+        
+        # Re-apply the override to ensure the new specimen starts with RED buttons
+        if hasattr(self, 'lwOnlyCheckBox') and self.lwOnlyCheckBox.isChecked():
+            self.toggleLWOnly()
+            
         #  clear the comment
         self.comment=''
         #  reset the editing state
