@@ -426,8 +426,8 @@
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <layout class="QGridLayout" name="gridLayout_3" rowminimumheight="40,40,40">
-         <item row="1" column="2">
-          <widget class="QLabel" name="label_3">
+         <item row="2" column="3">
+          <widget class="QLabel" name="label_6">
            <property name="font">
             <font>
              <family>Arial Black</family>
@@ -435,27 +435,11 @@
             </font>
            </property>
            <property name="text">
-            <string>Sampling Method</string>
+            <string>Specimen ID</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="3">
-          <widget class="QComboBox" name="samplingMethodBox">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="font">
-            <font>
-             <family>Arial Black</family>
-             <pointsize>14</pointsize>
-            </font>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="3">
+         <item row="0" column="4">
           <widget class="QComboBox" name="lengthTypeBox">
            <property name="minimumSize">
             <size>
@@ -471,7 +455,7 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="2">
+         <item row="0" column="3">
           <widget class="QLabel" name="label">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
@@ -492,20 +476,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="2">
-          <widget class="QLabel" name="label_6">
-           <property name="font">
-            <font>
-             <family>Arial Black</family>
-             <pointsize>14</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Specimen ID</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="3">
+         <item row="2" column="4">
           <widget class="QLabel" name="specimenLabel">
            <property name="minimumSize">
             <size>
@@ -539,7 +510,9 @@
            <property name="font">
             <font>
              <family>Arial Black</family>
-             <pointsize>14</pointsize>
+             <pointsize>12</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
             </font>
            </property>
            <property name="text">
@@ -547,7 +520,7 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1" rowspan="3">
+         <item row="0" column="2" rowspan="3">
           <widget class="QLabel" name="picLabel">
            <property name="font">
             <font>
@@ -565,7 +538,51 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="0" rowspan="2">
+         <item row="1" column="4">
+          <widget class="QComboBox" name="samplingMethodBox">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <family>Arial Black</family>
+             <pointsize>14</pointsize>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="3">
+          <widget class="QLabel" name="label_3">
+           <property name="font">
+            <font>
+             <family>Arial Black</family>
+             <pointsize>14</pointsize>
+            </font>
+           </property>
+           <property name="text">
+            <string>Sampling Method</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QCheckBox" name="lwOnlyCheckBox">
+           <property name="font">
+            <font>
+             <family>Arial Black</family>
+             <pointsize>12</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>LW Only</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0" rowspan="2" colspan="2">
           <widget class="QPushButton" name="cycleBtn">
            <property name="enabled">
             <bool>true</bool>
