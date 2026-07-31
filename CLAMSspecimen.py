@@ -100,7 +100,9 @@ class SpecPlotsDialog(QDialog, ui_CPSSpecPlots.Ui_Dialog):
             x_label = "Standard Length (mm)"
             bin_step = 10
             bins = list(range(10, 330, bin_step)) # 10 to 320
-        elif "mackerel" in species_name or species_code in ['172412', '168586', '164792', '161746', '551209']:
+        elif "mackerel" in species_name or species_code in ['172412', '168586', '164792', '161746', '551209','161702','162053','162028','162030','162035','162049','166012','162051',
+                                                            '161983','161975','161976','161977','161979','161980','161989','161974'
+                                                            ]:
             length_col = "fork_length_mm"
             x_label = "Fork Length (mm)"
             bin_step = 25
