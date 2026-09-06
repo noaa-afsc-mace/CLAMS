@@ -738,16 +738,16 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         #  the event_parameters for the averages so they are specific to the mounting
         #  location. I have omitted computing averages for Camtrawl and "Other" for now.
 
-        #  set the event_parameters based on the mountng location
+        #  set the event_parameters based on the mounting location
         avgDepthParam, avgTempParam = self.getAveragesParamNames(self.sbeLocation)
         if avgDepthParam is None:
             #  we don't compute averages for this mounting location
             return
 
-        ship=self.shipLabel.text()
-        survey=self.surveyLabel.text()
-        haul=self.haulLabel.text()
-        p='Codend'
+        ship = self.shipLabel.text()
+        survey = self.surveyLabel.text()
+        haul = self.haulLabel.text()
+        p = 'MainTrawl'
         avgTemp = float('nan')
         avgDepth = float('nan')
 
@@ -756,20 +756,22 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
                               f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
                               f"AND event_parameter IN ({fishing_params})")
-        eqTime=query.first()
+        eq_result = query.first()
+        eqTime = eq_result[0] if eq_result else None
 
         # Find HB time
         stop_params = "'HB', 'Haulback'"
         query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
                               f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
                               f"AND event_parameter IN ({stop_params})")
-        hbTime=query.first()
+        hb_result = query.first()
+        hbTime = hb_result[0] if hb_result else None
 
         if eqTime and hbTime:
             # Find temperature data between EQ & HB and average
-            query=self.db.dbQuery(f"Select measurement_value FROM {self.schema}.event_stream_data WHERE"+
-                            f" time_stamp between to_timestamp('{eqTime[0]}','MMDDYYYY HH24:MI:SS.FF3')" +
-                            f" and to_timestamp('{hbTime[0]}','MMDDYYYY HH24:MI:SS:FF3') AND " +
+            query=self.db.dbQuery(f"SELECT measurement_value FROM {self.schema}.event_stream_data WHERE"+
+                            f" time_stamp between to_timestamp('{eqTime}','MMDDYYYY HH24:MI:SS.FF3')" +
+                            f" and to_timestamp('{hbTime}','MMDDYYYY HH24:MI:SS:FF3') AND " +
                             f" device_id={self.device_id} AND measurement_type='SBETemperature'")
 
             query_val =query.first()
@@ -783,9 +785,9 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
                     avgTemp = cumVal / nVals
 
             # Find depth data between EQ & HB and average
-            query=self.db.dbQuery(f"Select measurement_value FROM {self.schema}.event_stream_data WHERE"+
-                            f" time_stamp between to_timestamp('{eqTime[0]}','MMDDYYYY HH24:MI:SS.FF3')" +
-                            f" and to_timestamp('{hbTime[0]}','MMDDYYYY HH24:MI:SS:FF3') AND " +
+            query=self.db.dbQuery(f"SELECT measurement_value FROM {self.schema}.event_stream_data WHERE"+
+                            f" time_stamp between to_timestamp('{eqTime}','MMDDYYYY HH24:MI:SS.FF3')" +
+                            f" and to_timestamp('{hbTime}','MMDDYYYY HH24:MI:SS:FF3') AND " +
                             f" device_id={self.device_id} AND measurement_type='SBEDepth'")
 
             if query.first():
