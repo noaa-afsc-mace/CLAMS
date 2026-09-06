@@ -419,7 +419,6 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         # go through each event type entered into database and add to the table
         row = 0
         for ev, ts in ev_query:
-            print(ev)
             self.dataTable.setRowCount(row + 1)
             # add to button order list
             self.button_order.append(ev)
@@ -842,7 +841,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
                        f"event_id, device_id, time_stamp, measurement_type, measurement_value) "
                        f"VALUES ({self.ship}, {self.survey}, {str(self.activeEvent)}, "
                        f"{self.deviceData[device_name]['id']}, "
-                       f"TO_TIMESTAMP('{time}', 'MMDDYYYY HH24:MI:22.MS')::timestamp, '{measurement}', '{data}')")
+                       f"TO_TIMESTAMP('{time}', 'MMDDYYYY HH24:MI:SS.MS')::timestamp, '{measurement}', '{data}')")
                 self.db.dbExec(sql)
                 wroteToDb = True
 
