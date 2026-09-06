@@ -292,7 +292,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             self.cb_haulLabel.addItem(str(event_id))
 
         # Set the default to the active event if it exists in the configuration
-        organization = self.settings.get('Organization', '').strip().upper()
+        organization = self.settings.get('OrganizationName', '').strip().upper()
         active_event = self.settings.get('ActiveEvent')
         self.cb_haulLabel.clear()
 
