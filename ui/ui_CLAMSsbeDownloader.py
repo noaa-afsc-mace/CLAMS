@@ -176,7 +176,7 @@ class Ui_sbeDownloader(object):
         font = QtGui.QFont()
         font.setFamily("Arial")
         font.setPointSize(14)
-        font.setBold(True)
+        font.setBold(False)
         self.cb_haulLabel.setFont(font)
         self.cb_haulLabel.setObjectName("cb_haulLabel")
         self.gridLayout.addWidget(self.cb_haulLabel, 3, 1, 1, 1)

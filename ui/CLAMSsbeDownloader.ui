@@ -354,7 +354,7 @@
          <font>
           <family>Arial</family>
           <pointsize>14</pointsize>
-          <bold>true</bold>
+          <bold>false</bold>
          </font>
         </property>
        </widget>
