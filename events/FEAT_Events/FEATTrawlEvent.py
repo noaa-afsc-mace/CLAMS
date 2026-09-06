@@ -695,7 +695,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
                 return
 
             # get the current row that is empty in the data table
-            if self.cur_dt_row > 9:
+            if self.cur_dt_row >= self.dataTable.rowCount():
                 # add an additional row
                 self.dataTable.insertRow(self.cur_dt_row)
                 self.dataTable.scrollToBottom()
