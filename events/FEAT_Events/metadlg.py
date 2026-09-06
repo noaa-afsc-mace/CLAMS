@@ -47,6 +47,7 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
     def __init__(self, parent=None):
         super(MetaDlg, self).__init__(parent)
         self.setupUi(self)
+
         self.settings = parent.settings
         self.db = parent.db
         self.activeEvent = parent.activeEvent
@@ -63,6 +64,14 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
         self.msg_shown = parent.msg_shown
 
         self.message = messagedlg.MessageDlg(self)
+
+        # hide the MMED label and checkbox if not requires
+        try:
+            if self.settings['MMED'] == 'False':
+                self.l_mmed.hide()
+                self.ckb_mmed.hide()
+        except:
+            pass
 
         # this is all hard-coded for now todo: should use DB for this later
         self.required_params = ['Transect', 'TrawlScientist', 'Gear']
@@ -267,21 +276,36 @@ class MetaDlg(QDialog, ui_MetaDlg.Ui_metaDlg):
                 # dialog was closed - fix if there is a better way
                 return 'stub'
         else:
-            # see if the checkbox is clicked or not
-            exists = self.check_if_exists('Uphill', 'ed')
-            if exists == 0:
+            # deal with checkboxes
+            # uphill checkbox #
+            up_exists = self.check_if_exists('Uphill', 'ed')
+            if up_exists == 0:
                 if self.ckb_uphill.isChecked():
-                    up_sql = ("INSERT INTO " + self.schema +
-                              ".event_data (ship, survey, event_id, partition, event_parameter, parameter_value) "
-                              "VALUES (" + self.ship + ", " + self.survey + ", " + str(self.activeEvent) +
-                              ", 'MainTrawl', 'Uphill', 'Y')")
-                    self.db.dbQuery(up_sql)
+                    up_sql = (f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
+                              f"event_parameter, parameter_value) "
+                              f"VALUES ({self.ship}, {self.survey}, {self.activeEvent}, 'MainTrawl', 'Uphill', 'Y')")
+                    self.db.dbExec(up_sql)
             else:
                 if not self.ckb_uphill.isChecked():
-                    del_sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.ship +
-                               " AND survey=" + self.survey + " AND event_id=" + str(self.activeEvent) +
-                               " AND partition='MainTrawl' AND event_parameter='Uphill'")
-                    self.db.dbQuery(del_sql)
+                    del_sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.ship} "
+                               f"AND survey={self.survey} AND event_id={self.activeEvent} "
+                               f"AND partition='MainTrawl' AND event_parameter='Uphill'")
+                    self.db.dbExec(del_sql)
+
+            # mmed checkbox #
+            mmed_exists = self.check_if_exists('MMED', 'ed')
+            if mmed_exists == 0:
+                if self.ckb_mmed.isChecked():
+                    mmed_sql = (f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
+                                f"event_parameter, parameter_value) "
+                                f"VALUES ({self.ship}, {self.survey}, {self.activeEvent}, 'MainTrawl', 'MMED', 'Y')")
+                    self.db.dbExec(mmed_sql)
+            else:
+                if not self.ckb_mmed.isChecked():
+                    del_mmed_sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.ship} "
+                                    f"AND survey={self.survey} AND event_id={self.activeEvent} "
+                                    f"AND partition='MainTrawl' AND event_parameter='MMED'")
+                    self.db.dbExec(del_mmed_sql)
 
             # iterate over all buttons and dropdowns
             for param, pb_lst in self.pbs.items():

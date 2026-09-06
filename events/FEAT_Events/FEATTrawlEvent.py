@@ -111,7 +111,16 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         self.edit_flag = False
         self.prev_ts = None
         self.current_scs = {}
-        self.msg_shown = False
+
+        try:
+            if self.settings['EALWarn'] in ('True', 'true'):
+                self.msg_shown = False
+            else:
+                self.msg_shown = True
+        except KeyError:
+            # default to show the warning
+            self.msg_shown = False
+
 
         # set up the time to display for the timer
         self.niw_time = QTime(0, 0, 0)
@@ -198,8 +207,8 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         #  event_stream_data table at different rates depending on where we are in
         #  the event. We write faster between TD and HB, and slower before TD
         #  and after HB.
-        sql = ("SELECT parameter_value FROM " + self.schema + ".application_configuration " +
-               "WHERE parameter='EventStreamEQHBLogInt'")
+        sql = (f"SELECT parameter_value FROM {self.schema}.application_configuration "
+               f"WHERE parameter='EventStreamEQHBLogInt'")
         query = self.db.dbQuery(sql)
         val, = query.first()
         if val:
@@ -208,8 +217,8 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
             except:
                 pass
 
-        sql = ("SELECT parameter_value FROM " + self.schema + ".application_configuration " +
-               "WHERE parameter='EventStreamPreEQLogInt'")
+        sql = (f"SELECT parameter_value FROM {self.schema}.application_configuration "
+               f"WHERE parameter='EventStreamPreEQLogInt'")
         query = self.db.dbQuery(sql)
         val, = query.first()
         if val:
@@ -219,8 +228,8 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
                 pass
 
         # if this is a restart or continuation of an already started event, reload previously collected data
-        sql = ("SELECT event_id FROM " + self.schema + ".events WHERE ship=" + self.ship + " AND survey="
-               + self.survey + " AND event_id=" + str(self.activeEvent))
+        sql = (f"SELECT event_id FROM {self.schema}.events WHERE ship={self.ship} AND survey="
+               f"{self.survey} AND event_id={self.activeEvent}")
         query = self.db.dbQuery(sql)
         event_id, = query.first()
         if event_id:
@@ -382,8 +391,8 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         self.enter_meta_info()
 
         # populate comments and get the performance
-        sql = ("SELECT performance_code, comments FROM " + self.schema + ".events WHERE ship=" + self.ship +
-               " AND survey=" + self.survey + " AND event_id=" + self.activeEvent)
+        sql = (f"SELECT performance_code, comments FROM {self.schema}.events WHERE ship={self.ship} "
+               f"AND survey={self.survey} AND event_id={self.activeEvent}")
         query = self.db.dbQuery(sql)
         perf_code, self.comment = query.first()
         if int(perf_code) < 0:
@@ -397,19 +406,20 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         td_elapsed = 0
 
         # get event types entered by timestamp
-        ev_sql = ("SELECT event_parameter, to_char(to_timestamp(parameter_value, 'MMDDYYYY HH24:MI:SS.FF3'), "
-                  "'YYYY-MM-DD H24:MI:SS.FF3') AS times "
-                  "FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
-                  " AND event_id=" + self.activeEvent + " AND partition='MainTrawl' AND event_parameter IN "
-                                                        "('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM01', 'COM02', "
-                                                        "'COM03', 'COM04', 'COM05', 'COM06', 'COM07', 'COM08', 'COM09',"
-                                                        " 'COM10', 'COM11', 'COM12', 'COM14', 'COM14', 'COM15') "
-                                                        "ORDER BY times ASC")
+        ev_sql = (f"SELECT event_parameter, to_char(to_timestamp(parameter_value, 'MMDDYYYY HH24:MI:SS.FF3'), "
+                  f"'YYYY-MM-DD H24:MI:SS.FF3') AS times "
+                  f"FROM {self.schema}.event_data WHERE ship={self.ship} AND survey={self.survey} "
+                  f"AND event_id={self.activeEvent} AND partition='MainTrawl' AND event_parameter IN "
+                  f"('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM01', 'COM02', "
+                  f"'COM03', 'COM04', 'COM05', 'COM06', 'COM07', 'COM08', 'COM09',"
+                  f" 'COM10', 'COM11', 'COM12', 'COM14', 'COM14', 'COM15') "
+                  f"ORDER BY times ASC")
         ev_query = self.db.dbQuery(ev_sql)
 
         # go through each event type entered into database and add to the table
         row = 0
         for ev, ts in ev_query:
+            print(ev)
             self.dataTable.setRowCount(row + 1)
             # add to button order list
             self.button_order.append(ev)
@@ -424,9 +434,9 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
             self.idxs.append(ind)
 
             #  first check for event_data parameters
-            sql = ("SELECT event_parameter, parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
-                   self.ship + " AND survey=" + self.survey + " AND event_id=" + self.activeEvent +
-                   " AND partition='MainTrawl' AND event_parameter='" + ev + "'")
+            sql = (f"SELECT event_parameter, parameter_value FROM {self.schema}.event_data WHERE ship={self.ship} "
+                   f"AND survey={self.survey} AND event_id={self.activeEvent} "
+                   f"AND partition='MainTrawl' AND event_parameter='{ev}'")
             query = self.db.dbQuery(sql)
             param, val = query.first()
 
@@ -720,6 +730,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         self.dataTable.resizeColumnsToContents()
 
         # deal with the timers and buttons
+        # 9/6/26 - added entry of latitude if TD is pressed for SBE processing
         if 'TD' in self.cur_btn_txt:
             # set/reset the timer
             if self.edit_flag:
@@ -729,6 +740,17 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
             else:
                 self.td_timer.timeout.connect(lambda: self.display_time('td'))
                 self.td_timer.start(1000)
+            # if TD is pressed, add in TDRLatitude to event_data
+            tdr_lat_check = self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data "
+                                            f"WHERE ship={self.ship} AND survey={self.survey} "
+                                            f"AND event_id={self.activeEvent} AND partition='MainTrawl' "
+                                            f"AND event_parameter='TDRLatitude'")
+            if not tdr_lat_check.first():
+                #  extract the lat/lon
+                lat = self.dispVector[0]
+                self.db.dbExec(f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
+                               f"event_parameter, parameter_value) VALUES ({self.ship}, {self.survey}, "
+                               f"{self.activeEvent}, 'MainTrawl', 'TDRLatitude', '{lat}')")
             # if TD is pressed, send up net dimensions
             self.net_btn = 'TD'
             self.get_net_dims()
@@ -792,7 +814,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         datetime = QDateTime.currentDateTime()
         time = str(datetime.toString('MMddyyyy hh:mm:ss.zzz'))
 
-        # iterate thru the the list of SCS sensor datagrams and write to database
+        # iterate thru the list of SCS sensor datagrams and write to database
         if self.testing:
             self.dispVector = ['testlat', 'testlon', 'testdepth']
         else:
@@ -800,7 +822,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
 
             # get the measurement type - while devices can be associated with multiple
             # measurements, in this context this doesn't make sense so we will assume
-            # the first measurement assigned to this de
+            # the first measurement assigned to this device
             measurement = self.deviceData[device_name]['measurements']['trawlevent'][0]
             # check that we have data for this sensor
             if data is None or data.strip() == '':
@@ -816,11 +838,11 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
             elapsedSecs = self.lastSCSWriteTime[device_name].secsTo(datetime)
             if elapsedSecs >= self.SCSLogInterval:
                 #  insert into the database
-                sql = ("INSERT INTO " + self.schema + ".event_stream_data (ship, survey, " +
-                       "event_id, device_id, time_stamp, measurement_type, measurement_value) " +
-                       "VALUES (" + self.ship + "," + self.survey + "," + str(self.activeEvent) + "," +
-                       self.deviceData[device_name]['id'] + ",'" + time + "','" + measurement +
-                       "','" + data + "')")
+                sql = (f"INSERT INTO " + self.schema + ".event_stream_data (ship, survey, " +
+                       f"event_id, device_id, time_stamp, measurement_type, measurement_value) "
+                       f"VALUES ({self.ship}, {self.survey}, {str(self.activeEvent)}, "
+                       f"{self.deviceData[device_name]['id']}, "
+                       f"TO_TIMESTAMP('{time}', 'MMDDYYYY HH24:MI:22.MS')::timestamp, '{measurement}', '{data}')")
                 self.db.dbExec(sql)
                 wroteToDb = True
 
