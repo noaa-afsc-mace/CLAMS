@@ -4,14 +4,18 @@ CLAMSsbeDownloader is a replacement for the MACE SBE download program. This is a
 further extension of the MACE mini Downloader used in 2015 which has been modified
 to work exclusively with CLAMS. It does not offer the option to download to a text
 file and requires a connection to CLAMS and active survey, ship, and haul values
-must exists in the application_configuration table.
+must exist in the application_configuration table.
 
 Also note that this application will attempt to get the latitude to use for pressure
 to depth conversions from the EQLatitude parameter in the event_data table. If this
 parameter doesn't exist for the active event, it will use a default value of 56.
+
+UPDATES Alicia Billings - Sept 2026
+ - preparation for using SBE39+ units
+ - cleaning up some code and queries
 """
 
-#  import dependent modules
+#  imports
 import os
 import sys
 import math
@@ -57,12 +61,19 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         self.sbe = None
         self.sbeProgress = None
 
-        #  this is the default latitude used when converting SBE pressure to depth
-        #  when the 'SBEConversionLat' parameter is not in the application_configuration
-        #  table, or if the value provided there is not a float.
+        self.completeSound = None
+        self.haulLat = None
+        self.workStation = None
+        self.device_id = None
+
+        #  when the 'SBEConversionLat' parameter is not set in the application_configuration
+        #  table, the value provided there is not a float, or there is no TD latitude to grab, this is the
+        #  default value to use - set around the GOA
         self.defaultEQLatitude = 56.0
 
         #  restore the application state
+        #  the default com port should be set in the application_configuration table 'SBEComPort',
+        #  but is set to COM4 here if it isn't there
         self.appSettings = QSettings('CLAMS', 'CLAMSsbeDownloader')
         size = self.appSettings.value('winsize', QSize(690,560))
         position = self.appSettings.value('winposition', QPoint(10,10))
@@ -95,18 +106,6 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         #  on the sbeSetInterval dialog
         self.sbeIntervalDlg.sbeSetIntervalSignal.connect(self.intervalSet)
 
-        #  connect the SBE39 signals
-        """
-        self.sbe.SBEStatus.connect(self.sbeStatusUpdate)
-        self.sbe.SBEConnected.connect(self.connected)
-        self.sbe.SBETimeout.connect(self.sbeTimeout)
-        self.sbe.SBEData.connect(self.showSBEData)
-        self.sbe.SBEProgress.connect(self.showProgress)
-        self.sbe.SBEDownloadComplete.connect(self.downloadingData)
-        self.sbe.SBEDownloadData.connect(self.downloadingData)
-        self.sbe.SBEAbort.connect(self.downloadAbort)
-        """
-
         #  connect this GUI's button signals
         self.actionExit.triggered.connect(self.close)
         self.actionSetInterval.triggered.connect(self.setInterval)
@@ -138,11 +137,12 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def startApplication(self):
-
-        #  determine if we're connecting to an Oracle, postgres, or "other"
-        #  database. Since the Oracle driver does not ship compiled with
-        #  Qt, we use ODBC for Oracle. Postgres uses the Qt "native" postgres
-        #  driver. Other uses ODBC.
+        """
+        starts the application by connecting to the database for parameters
+        and to determine which model of SBE39 is being used
+        :return:
+        """
+        #  determine which database engine is being used from the application_configuration table
         if self.settings['Database'].lower() == 'oracle':
             isOracle = True
             driver = 'QODBC'
@@ -155,7 +155,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             isOracle = False
             driver = 'QODBC'
 
-        #  clean up and check our paths if any fail, try to fallback to local folders
+        #  clean up and check our paths if any fail, try to fall back to local folders
         if 'ImageDir' in self.settings:
             self.settings['ImageDir'], exists = self.checkPath(self.settings['ImageDir'], 'images')
         else:
@@ -170,6 +170,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             self.settings['SoundsDir'], exists = self.checkPath(None, 'sounds')
 
         #  if we're missing any credentials, get them from the user
+        # todo: hostname, port, and schema is required for postgres so update this to catch those missing items as well
         if self.dbName == '' or self.dbUser == '' or self.dbPassword == '':
             connectionDialog = connectdlg.ConnectDlg(self.dbName, self.dbUser,
                                                      self.dbPassword, createConnection=False, parent=self)
@@ -215,18 +216,15 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         for parameter, parameter_value in query:
             self.settings.update({parameter: parameter_value})
 
-        # --- 1. UPDATE DEFAULT CONVERSION LATITUDE FROM SETTINGS ---
         if 'SBEConversionLat' in self.settings:
             try:
                 self.defaultEQLatitude = float(self.settings['SBEConversionLat'])
             except ValueError:
-                pass  # Fall back to self.defaultEQLatitude = 56.0
+                pass
 
-        # --- 2. UPDATE DEFAULT COM PORT FROM SETTINGS ---
         if 'SBEComPort' in self.settings:
             self.comPort = self.settings['SBEComPort']
 
-        # --- 3. INSTANTIATE SBE DRIVER (SBE39 vs SBE39PLUS) ---
         sbe_model = self.settings.get('SBEModel', 'SBE39').strip().upper()
 
         if sbe_model == 'SBE39PLUS':
@@ -245,7 +243,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         self.sbe.SBEAbort.connect(self.downloadAbort)
 
         #  create an instance of the SBE progress dialog - this dialog shows download progress
-        #  and it also has an abort button. You pass it the reference to the sbe object and it
+        #  and has an abort button. You pass it the reference to the sbe object and it
         #  handles the signals internally. You just need to show and hide it.
         self.sbeProgress = sbeProgressDialog.sbeProgressDialog(self.sbe, parent=self)
 
@@ -294,14 +292,16 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             return
 
         #  get the latitude of this event - first we try to get it from the event_data table
-        query = self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship = " + self.settings['ActiveShip'] +
-                " and survey =" + self.settings['ActiveSurvey'] + " and event_id =" + event +
-                " and event_parameter = 'EQLatitude'")
+        #  the latitude is pulled from when the net is 'fishing', which can be different for different centers
+        # todo: maybe use the application_configuration table to set this parameter?
+        fishing_parameters = ('EQLatitude', 'TDLatitude')
+        query = self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data "
+                                f"WHERE ship={self.settings['ActiveShip']} and survey={self.settings['ActiveSurvey']} "
+                                f"and event_id={event} and event_parameter IN {fishing_parameters}")
         eqLatitude, = query.first()
         if eqLatitude is None:
             #  event doesn't have an EQ entry, use default value from settings or hardcoded default
             eqLatitude = self.defaultEQLatitude
-
         try:
             self.haulLat = float(eqLatitude)
         except:
@@ -319,10 +319,11 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             if self.sbe:
                 self.sbe.setConnectionParams(self.comPort, self.baud)
 
-            # Update settings and GUI
+            # update settings and GUI
             self.appSettings.setValue('comport', self.comPort)
             self.appSettings.setValue('baud', self.baud)
             self.COMSettingsLabel.setText('COM Settings: ' + self.comPort + ', ' + str(self.baud))
+            # todo: update default in application_configuration?
 
 
     def showProgress(self, device, pctComplete):
@@ -372,7 +373,6 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
     def downloadingData(self, device, line):
 
-        #try:
         #  build the time string
         mdy = '{:02d}/{:02d}/{:04d}'.format(line[0].month, line[0].day, line[0].year)
         hms = '{:02d}:{:02d}:{:02d}'.format(line[0].hour, line[0].minute, line[0].second +
@@ -384,27 +384,20 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         #  insert data into database
         sql = (f"INSERT INTO {self.schema}.event_stream_data (ship, survey, event_id, device_id, " +
-                "time_stamp, measurement_type, measurement_value) VALUES (" + self.shipLabel.text() +
-                "," + self.surveyLabel.text() + "," + self.haulLabel.text() + "," + self.device_id +
-                ",TO_TIMESTAMP('" + time + "','MM/DD/YYYY HH24:MI:SS.FF'),'SBETemperature','" +
-                str(line[1]) + "')")
+                f"time_stamp, measurement_type, measurement_value) VALUES ({self.shipLabel.text()}, "
+                f"{self.surveyLabel.text()}, {self.haulLabel.text()}, {self.device_id}, "
+                f"TO_TIMESTAMP('{time}','MM/DD/YYYY HH24:MI:SS.FF'),'SBETemperature', '{str(line[1])}')")
         self.db.dbExec(sql)
         sql = (f"INSERT INTO {self.schema}.event_stream_data (ship, survey, event_id, device_id, " +
-                "time_stamp, measurement_type, measurement_value) VALUES ("+self.shipLabel.text() +
-                "," + self.surveyLabel.text() + "," + self.haulLabel.text() + "," + self.device_id +
-                ",TO_TIMESTAMP('"+time+"','MM/DD/YYYY HH24:MI:SS.FF'),'SBEDepth','"+str(depth)+"')")
+                f"time_stamp, measurement_type, measurement_value) VALUES ({self.shipLabel.text()}, "
+                f"{self.surveyLabel.text()}, {self.haulLabel.text()}, {self.device_id}, "
+                f"TO_TIMESTAMP('{time}','MM/DD/YYYY HH24:MI:SS.FF'),'SBEDepth','{str(depth)}')")
         self.db.dbExec(sql)
-
-#        except Exception as e:
-#            #  there was an error
-#           self.sbe.abort()
-#           self.downloadAbort()
-#           QMessageBox.critical(self, 'Download Failed', 'Error inserting data into database.' + str(e))
 
 
     def connectToSBE(self):
 
-        if (self.sbe.connected == False):
+        if not self.sbe.connected:
             #  we're connecting to the SBE - attempt to connect to the SBE
             try:
                 self.serialNumber = ''
@@ -435,11 +428,11 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def pressureToDepth(self, p, lat):
-        '''
+        """
         calculates depth based on latitude and pressure. From:
         Unesco 1983. Algorithms for computation of fundamental properties of
         seawater, 1983. _Unesco Tech. Pap. in Mar. Sci._, No. 44, 53 pp.
-        '''
+        """
 
         deg2rad = math.pi / 180.0
 
@@ -459,19 +452,18 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def sbeStatusUpdate(self, deviceName, status):
-        '''
+        """
         sbeStatusUpdate is called when we receive the results of a status request.
         We only care about the details when we are connecting to the SBE since
         that is when we extract the serial number. Otherwise we don't do anything.
-        '''
+        """
         if self.connecting:
             self.connecting = False
             self.serialNumber = status['serial number']
 
             # Match both SBE39 and SBE39Plus device models in the DEVICES table
-            sql = ("SELECT device_id FROM " + self.schema +
-                   ".devices WHERE (model LIKE 'SBE39%' OR model LIKE 'SBE 39%') " +
-                   "AND serial_number='" + self.serialNumber + "'")
+            sql = (f"SELECT device_id FROM {self.schema}.devices WHERE (model LIKE 'SBE39%' OR model LIKE 'SBE 39%') "
+                   f"AND serial_number='{self.serialNumber}'")
             query = self.db.dbQuery(sql)
             self.device_id, = query.first()
 
@@ -558,12 +550,12 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def setGUIButtons(self, state):
-        '''
+        """
         setGUIButtons sets the state of the GUI elements based on the connection
         state. True if we're connected to the SBE and False if not.
-        '''
+        """
 
-        if (state):
+        if state:
             self.connectButton.setText('Disconnect')
 
         else:
@@ -578,26 +570,23 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def getStatus(self):
-        '''
-        getStatus requests the status from the SBE.
-        '''
         self.sbe.getStatus()
 
 
     def startDownload(self):
-        '''
+        """
         startDownload attempts to start the SBE download process. It first checks for
         existing data, asking the user if they want to overwrite if found, and then it
         disconnects the SBEData signal (so we don't flood the console with data strings)
         and then tells the SBE class to download.
-        '''
+        """
 
         #  create an instance of the set location dialog to get the mounting location
         sbeLocationlDlg = sbeSetLocation.sbeSetLocation(parent=self)
         sbeLocationlDlg.exec()
 
         #  make sure that the user specified a location
-        if (sbeLocationlDlg.location is None):
+        if sbeLocationlDlg.location is None:
             #  no location specified
             return
 
@@ -606,40 +595,40 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         try:
             #  determine if this data has already been downloaded
-            sql = ("SELECT event_parameter FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() +
-                    " AND survey=" + self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() +
-                    " AND event_parameter like '%SBE' AND parameter_value='" + self.serialNumber + "'")
+            sql = (f"SELECT event_parameter FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()}" +
+                    f" AND survey={self.surveyLabel.text()} AND event_id={self.haulLabel.text()}" +
+                    f" AND event_parameter like '%SBE' AND parameter_value='{self.serialNumber}'")
             mountingLocQuery = self.db.dbQuery(sql)
             mountingLoc, = mountingLocQuery.first()
 
-            if (mountingLoc != None):
+            if mountingLoc is not None:
                 reply = QMessageBox.question(self, 'Warning!',"<font size = 14> You already downloaded SBE " +
                         "data for this haul and SBE device.  Do you want to overwrite? </font>",
                         QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
-                if (reply == QMessageBox.StandardButton.Yes):
+                if reply == QMessageBox.StandardButton.Yes:
 
                     #  get the parameters names for the previous mounting location
                     avgDepthParam, avgTempParam = self.getAveragesParamNames(mountingLoc)
 
                     #  now we can clear out old data
-                    sql = ("DELETE FROM " + self.schema + ".event_stream_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
-                            self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND device_id=" +
-                            self.device_id)
+                    sql = (f"DELETE FROM {self.schema}.event_stream_data WHERE ship={self.shipLabel.text()} AND survey=" +
+                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND device_id=" +
+                            f"{self.device_id}")
                     self.db.dbExec(sql)
                     #  and clear out the old average data as well
-                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
-                            self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
-                            "event_parameter='" + avgDepthParam + "'")
+                    sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
+                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"event_parameter='{avgDepthParam}'")
                     self.db.dbExec(sql)
-                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
-                            self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
-                            "event_parameter='" + avgTempParam + "'")
+                    sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
+                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"event_parameter='{avgTempParam}'")
                     self.db.dbExec(sql)
 
                     #  and lastly, clear out the mounting location
-                    sql = ("DELETE FROM " + self.schema + ".event_data WHERE ship=" + self.shipLabel.text() + " AND survey=" +
-                            self.surveyLabel.text() + " AND event_id=" + self.haulLabel.text() + " AND " +
-                            "event_parameter like '%SBE' AND parameter_value='" + self.serialNumber + "'")
+                    sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
+                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"event_parameter like '%SBE' AND parameter_value='{self.serialNumber}'")
                     self.db.dbExec(sql)
 
                 else:
@@ -647,12 +636,12 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
                     return
 
             #  insert the SBE mounting location into haul_data
-            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship,  survey, event_id, partition, " +
-                "event_parameter,  parameter_value) VALUES("+ self.shipLabel.text() +
-                "," + self.surveyLabel.text() + ","+self.haulLabel.text() + ",'Codend','" +
-                self.sbeLocation + "','"+ self.serialNumber +"')")
+            self.db.dbQuery(f"INSERT INTO {self.schema}.event_data (ship,  survey, event_id, partition, " +
+                f"event_parameter,  parameter_value) VALUES({self.shipLabel.text()}" +
+                f",{self.surveyLabel.text()},{self.haulLabel.text()},'Codend','" +
+                f"{self.sbeLocation}','{self.serialNumber}')")
 
-            #  show the progess dialog
+            #  show the progress dialog
             self.sbeProgress.show()
 
             #  disconnect the SBEData signal since displaying the data during
@@ -669,6 +658,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         except Exception as err:
             #  there was an error
             QMessageBox.critical(self, 'Error', 'Error downloading data: ' + str(err))
+
 
     def showSBEData(self, name, val, color='black'):
         if val:
@@ -705,7 +695,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def getAveragesParamNames(self, locationName):
-        '''
+        """
         getAveragesParamNames returns the event_parameters used to store the
         averages computed for the specified SBE mounting location. Since
         there isn't a straightforward way to identify these params in the
@@ -714,19 +704,19 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         This method is used both when deleting existing data and inserting
         averages for just downloaded data.
-        '''
+        """
 
         #  set the event_parameters based on the mountng location
-        if (locationName == 'HeadropeSBE'):
+        if locationName == 'HeadropeSBE':
             avgDepthParam = 'AvgSBEHeadRopeDepth'
             avgTempParam = 'AvgSBEHeadRopeTemp'
-        elif (locationName == 'FootropeSBE'):
+        elif locationName == 'FootropeSBE':
             avgDepthParam = 'AvgSBEFootRopeDepth'
             avgTempParam = 'AvgSBEFootRopeTemp'
-        elif (locationName == 'DropTSSBE'):
+        elif locationName == 'DropTSSBE':
             avgDepthParam = 'AvgSBEDropTSDepth'
             avgTempParam = 'AvgSBEDropTSTemp'
-        elif (locationName == 'DropcamSBE'):
+        elif locationName == 'DropcamSBE':
             avgDepthParam = 'AvgSBEDropcamDepth'
             avgTempParam = 'AvgSBEDropcamTemp'
         else:
@@ -734,7 +724,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             avgDepthParam = None
             avgTempParam = None
 
-        return (avgDepthParam, avgTempParam)
+        return avgDepthParam, avgTempParam
 
 
     def computeAverages(self):
@@ -750,7 +740,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         #  set the event_parameters based on the mountng location
         avgDepthParam, avgTempParam = self.getAveragesParamNames(self.sbeLocation)
-        if (avgDepthParam is None):
+        if avgDepthParam is None:
             #  we don't compute averages for this mounting location
             return
 
@@ -762,59 +752,60 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         avgDepth = float('nan')
 
         # Find EQ time
-        query=self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
-                              ship + " AND survey=" + survey + " AND event_id= " +
-                              haul + " AND partition='" + p+
-                              "' AND event_parameter = 'EQ'")
+        fishing_params = "'EQ', 'TD', 'TargetDepth'"
+        query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
+                              f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
+                              f"AND event_parameter IN ({fishing_params})")
         eqTime=query.first()
 
         # Find HB time
-        query=self.db.dbQuery("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship=" +
-                              ship + " AND survey=" + survey + " AND event_id= " +
-                              haul + " AND partition='" + p+
-                              "' AND event_parameter = 'Haulback'")
+        stop_params = "'HB', 'Haulback'"
+        query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
+                              f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
+                              f"AND event_parameter IN ({stop_params})")
         hbTime=query.first()
 
-        # Find temperature data between EQ & HB and average
-        query=self.db.dbQuery("Select measurement_value FROM " + self.schema + ".event_stream_data WHERE"+
-                        " time_stamp between to_timestamp('"+eqTime[0]+"','MMDDYYYY HH24:MI:SS.FF3')" +
-                        " and to_timestamp('"+hbTime[0]+"','MMDDYYYY HH24:MI:SS:FF3') AND " +
-                        " device_id=" + self.device_id + " AND measurement_type='SBETemperature'")
+        if eqTime and hbTime:
+            # Find temperature data between EQ & HB and average
+            query=self.db.dbQuery(f"Select measurement_value FROM {self.schema}.event_stream_data WHERE"+
+                            f" time_stamp between to_timestamp('{eqTime[0]}','MMDDYYYY HH24:MI:SS.FF3')" +
+                            f" and to_timestamp('{hbTime[0]}','MMDDYYYY HH24:MI:SS:FF3') AND " +
+                            f" device_id={self.device_id} AND measurement_type='SBETemperature'")
 
-        query_val =query.first()
-        if query_val:
-            cumVal = 0.
-            nVals = 0
-            for val, in query:
-                cumVal = cumVal + float(val)
-                nVals = nVals + 1
-            if nVals > 0:
-                avgTemp = cumVal / nVals
+            query_val =query.first()
+            if query_val:
+                cumVal = 0.
+                nVals = 0
+                for val, in query:
+                    cumVal = cumVal + float(val)
+                    nVals = nVals + 1
+                if nVals > 0:
+                    avgTemp = cumVal / nVals
 
-        # Find depth data between EQ & HB and average
-        query=self.db.dbQuery("Select measurement_value FROM " + self.schema + ".event_stream_data WHERE"+
-                        " time_stamp between to_timestamp('"+eqTime[0]+"','MMDDYYYY HH24:MI:SS.FF3')" +
-                        " and to_timestamp('"+hbTime[0]+"','MMDDYYYY HH24:MI:SS:FF3') AND " +
-                        " device_id=" + self.device_id + " AND measurement_type='SBEDepth'")
+            # Find depth data between EQ & HB and average
+            query=self.db.dbQuery(f"Select measurement_value FROM {self.schema}.event_stream_data WHERE"+
+                            f" time_stamp between to_timestamp('{eqTime[0]}','MMDDYYYY HH24:MI:SS.FF3')" +
+                            f" and to_timestamp('{hbTime[0]}','MMDDYYYY HH24:MI:SS:FF3') AND " +
+                            f" device_id={self.device_id} AND measurement_type='SBEDepth'")
 
-        if query.first():
-            cumVal = 0.
-            nVals = 0
-            for val, in query:
-                cumVal = cumVal + float(val)
-                nVals = nVals + 1
-            if nVals > 0:
-                avgDepth = cumVal / nVals
+            if query.first():
+                cumVal = 0.
+                nVals = 0
+                for val, in query:
+                    cumVal = cumVal + float(val)
+                    nVals = nVals + 1
+                if nVals > 0:
+                    avgDepth = cumVal / nVals
 
-        # Insert averages into event_data table
-        if not math.isnan(avgTemp):
-            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, " +
-                    "event_parameter, parameter_value) VALUES("+ ship+","+survey+","+haul+",'"+
-                    p+"','" + avgTempParam + "',"+str(avgTemp)+")")
+            # Insert averages into event_data table
+            if not math.isnan(avgTemp):
+                self.db.dbQuery(f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, " +
+                        f"event_parameter, parameter_value) VALUES({ship},{survey},{haul},'"+
+                        f"{p}','{avgTempParam}',{avgTemp})")
 
-            self.db.dbQuery("INSERT INTO " + self.schema + ".event_data (ship, survey, event_id, partition, " +
-                    "event_parameter, parameter_value) VALUES("+ship+","+survey+","+haul+",'"+
-                    p+"','" + avgDepthParam + "',"+str(avgDepth)+")")
+                self.db.dbQuery(f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, " +
+                        f"event_parameter, parameter_value) VALUES({ship},{survey},{haul},'"+
+                        f"{p}','{avgDepthParam}',{avgDepth})")
         else:
             #  unable to calculate averages
             QMessageBox.warning(self, 'Attention!', "Unable to calculate averages between EQ and " +
@@ -852,7 +843,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
 
     def checkWindowLocation(self, position, size, padding=[5, 25]):
-        '''
+        """
         checkWindowLocation accepts a window position (QPoint) and size (QSize)
         and returns a potentially new position and size if the window is currently
         positioned off the screen.
@@ -867,7 +858,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         If the user is holding the <shift> key while this method is run, the
         application will be forced to the primary monitor.
-        '''
+        """
 
         #  create a QRect that represents the app window
         appRect = QRect(position, size)
@@ -923,7 +914,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 if __name__ == "__main__":
 
     #  see if the ini file path was passed in
-    if (len(sys.argv) > 1):
+    if len(sys.argv) > 1:
         iniFile = sys.argv[1]
         iniFile = os.path.normpath(iniFile)
     else:
