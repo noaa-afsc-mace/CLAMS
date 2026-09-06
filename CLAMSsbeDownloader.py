@@ -294,10 +294,10 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         #  get the latitude of this event - first we try to get it from the event_data table
         #  the latitude is pulled from when the net is 'fishing', which can be different for different centers
         # todo: maybe use the application_configuration table to set this parameter?
-        fishing_parameters = ('EQLatitude', 'TDLatitude')
+        fishing_parameters = "'EQLatitude', 'TDRLatitude'"
         query = self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data "
                                 f"WHERE ship={self.settings['ActiveShip']} and survey={self.settings['ActiveSurvey']} "
-                                f"and event_id={event} and event_parameter IN {fishing_parameters}")
+                                f"and event_id={event} and event_parameter IN ({fishing_parameters})")
         eqLatitude, = query.first()
         if eqLatitude is None:
             #  event doesn't have an EQ entry, use default value from settings or hardcoded default
