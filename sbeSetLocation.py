@@ -50,6 +50,7 @@ class sbeSetLocation(QDialog, ui_sbeSetLocation.Ui_sbeSetLocation):
         #  initialize the parents
         super(sbeSetLocation, self).__init__(parent)
         self.setupUi(self)
+        self.settings = parent.settings
 
         #  self.location stores the mounting location
         self.location = None
@@ -61,7 +62,11 @@ class sbeSetLocation(QDialog, ui_sbeSetLocation.Ui_sbeSetLocation):
         #  'Headrope' will be inserted in event_data as "HeadropeSBE"
         #  If you need to add a new location, it must first be added to the
         #  event_parameters table
-        self.locations = ['Headrope', 'Footrope', 'Camtrawl', 'DropTS', 'Dropcam', 'Other']
+        if self.settings['OrganizationName'] == 'NWFSC':
+            self.locations = ['Headrope', 'Footrope', 'Camera', 'Other']
+        else:
+            self.locations = ['Headrope', 'Footrope', 'Camtrawl', 'DropTS', 'Dropcam', 'Other']
+
         self.cbLocation.addItems(self.locations)
 
         #  set the combobox initial value - WE WANT IT TO DEFAULT TO HEADROPE
