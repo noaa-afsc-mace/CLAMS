@@ -269,42 +269,91 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             self.completeSound.setSource(QUrl.fromLocalFile(self.settings['SoundsDir'] +
                     'dp_starwars_yahoo.wav'))
 
-        # populate from active ship, survey, and event stuff
+        # populate from active ship and survey
         try:
-            self.shipLabel.setText(self.settings['ActiveShip'])
-            self.surveyLabel.setText(self.settings['ActiveSurvey'])
+            ship = self.settings['ActiveShip']
+            survey = self.settings['ActiveSurvey']
+            self.shipLabel.setText(ship)
+            self.surveyLabel.setText(survey)
         except:
-            QMessageBox.critical(self,"ERROR", "ActiveEvent and/or ActiveSurvey are not in the " +
-                    "application_configuration table. Something is not right. Ask your CLAMS " +
-                    "database administrator.")
+            QMessageBox.critical(self, "ERROR", "ActiveShip and/or ActiveSurvey are not in the " +
+                                 "application_configuration table. Something is not right. Ask your CLAMS " +
+                                 "database administrator.")
             self.db.dbClose()
             self.close()
             return
 
-        try:
-            event = self.settings['ActiveEvent']
-            self.haulLabel.setText(event)
-        except:
-            QMessageBox.critical(self,"ERROR", "ActiveEvent is missing from the application_configuration " +
-                    "table. Something is not right. Ask your CLAMS database administrator.")
-            self.db.dbClose()
-            self.close()
+        # Query the database for all hauls associated with this ship and survey
+        sql = f"SELECT event_id FROM {self.schema}.events WHERE ship={ship} AND survey={survey} ORDER BY event_id DESC"
+        query = self.db.dbQuery(sql)
+
+        self.cb_haulLabel.clear()
+        for event_id, in query:
+            self.cb_haulLabel.addItem(str(event_id))
+
+        # Set the default to the active event if it exists in the configuration
+        organization = self.settings.get('Organization', '').strip().upper()
+        active_event = self.settings.get('ActiveEvent')
+        self.cb_haulLabel.clear()
+
+        if organization == 'NWFSC':
+            # NWFSC: Allow haul selection. Load all hauls for this ship/survey.
+            sql = f"SELECT event_id FROM {self.schema}.events WHERE ship={ship} AND survey={survey} ORDER BY event_id DESC"
+            query = self.db.dbQuery(sql)
+
+            for event_id, in query:
+                self.cb_haulLabel.addItem(str(event_id))
+
+            # Set the default to the active event
+            if active_event:
+                index = self.cb_haulLabel.findText(str(active_event))
+                if index >= 0:
+                    self.cb_haulLabel.setCurrentIndex(index)
+
+            # Enable the dropdown so the user can interact with it
+            self.cb_haulLabel.setEnabled(True)
+
+        else:
+            # NOT NWFSC: Lock it down to just the active event
+            if active_event:
+                self.cb_haulLabel.addItem(str(active_event))
+            else:
+                QMessageBox.critical(self, "ERROR", "ActiveEvent is missing from the application_configuration " +
+                                     "table. Something is not right. Ask your CLAMS database administrator.")
+                self.db.dbClose()
+                self.close()
+                return
+
+            # Disable the dropdown (makes it read-only, behaving like a label)
+            self.cb_haulLabel.setEnabled(False)
+
+        # Connect the combobox change signal so haulLat updates automatically when the user picks a new haul
+        self.cb_haulLabel.currentTextChanged.connect(self.updateHaulData)
+
+        # Initialize the haulLat for the currently selected event
+        self.updateHaulData(self.cb_haulLabel.currentText())
+
+    def updateHaulData(self, event_id):
+        """Updates the latitude used for depth calculation based on the selected haul."""
+        if not event_id:
             return
 
-        #  get the latitude of this event - first we try to get it from the event_data table
-        #  the latitude is pulled from when the net is 'fishing', which can be different for different centers
-        # todo: maybe use the application_configuration table to set this parameter?
         fishing_parameters = "'EQLatitude', 'TDRLatitude'"
         query = self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data "
-                                f"WHERE ship={self.settings['ActiveShip']} and survey={self.settings['ActiveSurvey']} "
-                                f"and event_id={event} and event_parameter IN ({fishing_parameters})")
-        eqLatitude, = query.first()
+                                f"WHERE ship={self.shipLabel.text()} and survey={self.surveyLabel.text()} "
+                                f"and event_id={event_id} and event_parameter IN ({fishing_parameters})")
+
+        # Safely extract using the tuple logic fixed earlier
+        eq_result = query.first()
+        eqLatitude = eq_result[0] if eq_result else None
+
         if eqLatitude is None:
-            #  event doesn't have an EQ entry, use default value from settings or hardcoded default
+            # event doesn't have an EQ entry, use default value from settings or hardcoded default
             eqLatitude = self.defaultEQLatitude
+
         try:
             self.haulLat = float(eqLatitude)
-        except:
+        except (ValueError, TypeError):
             self.haulLat = self.defaultEQLatitude
 
 
@@ -385,12 +434,12 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         #  insert data into database
         sql = (f"INSERT INTO {self.schema}.event_stream_data (ship, survey, event_id, device_id, " +
                 f"time_stamp, measurement_type, measurement_value) VALUES ({self.shipLabel.text()}, "
-                f"{self.surveyLabel.text()}, {self.haulLabel.text()}, {self.device_id}, "
+                f"{self.surveyLabel.text()}, {self.cb_haulLabel.currentText()}, {self.device_id}, "
                 f"TO_TIMESTAMP('{time}','MM/DD/YYYY HH24:MI:SS.FF'),'SBETemperature', '{str(line[1])}')")
         self.db.dbExec(sql)
         sql = (f"INSERT INTO {self.schema}.event_stream_data (ship, survey, event_id, device_id, " +
                 f"time_stamp, measurement_type, measurement_value) VALUES ({self.shipLabel.text()}, "
-                f"{self.surveyLabel.text()}, {self.haulLabel.text()}, {self.device_id}, "
+                f"{self.surveyLabel.text()}, {self.cb_haulLabel.currentText()}, {self.device_id}, "
                 f"TO_TIMESTAMP('{time}','MM/DD/YYYY HH24:MI:SS.FF'),'SBEDepth','{str(depth)}')")
         self.db.dbExec(sql)
 
@@ -596,7 +645,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         try:
             #  determine if this data has already been downloaded
             sql = (f"SELECT event_parameter FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()}" +
-                    f" AND survey={self.surveyLabel.text()} AND event_id={self.haulLabel.text()}" +
+                    f" AND survey={self.surveyLabel.text()} AND event_id={self.cb_haulLabel.currentText()}" +
                     f" AND event_parameter like '%SBE' AND parameter_value='{self.serialNumber}'")
             mountingLocQuery = self.db.dbQuery(sql)
             mountingLoc, = mountingLocQuery.first()
@@ -612,22 +661,22 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
                     #  now we can clear out old data
                     sql = (f"DELETE FROM {self.schema}.event_stream_data WHERE ship={self.shipLabel.text()} AND survey=" +
-                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND device_id=" +
+                            f"{self.surveyLabel.text()} AND event_id={self.cb_haulLabel.currentText()} AND device_id=" +
                             f"{self.device_id}")
                     self.db.dbExec(sql)
                     #  and clear out the old average data as well
                     sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
-                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"{self.surveyLabel.text()} AND event_id={self.cb_haulLabel.currentText()} AND " +
                             f"event_parameter='{avgDepthParam}'")
                     self.db.dbExec(sql)
                     sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
-                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"{self.surveyLabel.text()} AND event_id={self.cb_haulLabel.currentText()} AND " +
                             f"event_parameter='{avgTempParam}'")
                     self.db.dbExec(sql)
 
                     #  and lastly, clear out the mounting location
                     sql = (f"DELETE FROM {self.schema}.event_data WHERE ship={self.shipLabel.text()} AND survey=" +
-                            f"{self.surveyLabel.text()} AND event_id={self.haulLabel.text()} AND " +
+                            f"{self.surveyLabel.text()} AND event_id={self.cb_haulLabel.currentText()} AND " +
                             f"event_parameter like '%SBE' AND parameter_value='{self.serialNumber}'")
                     self.db.dbExec(sql)
 
@@ -638,7 +687,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             #  insert the SBE mounting location into haul_data
             self.db.dbQuery(f"INSERT INTO {self.schema}.event_data (ship,  survey, event_id, partition, " +
                 f"event_parameter,  parameter_value) VALUES({self.shipLabel.text()}" +
-                f",{self.surveyLabel.text()},{self.haulLabel.text()},'Codend','" +
+                f",{self.surveyLabel.text()},{self.cb_haulLabel.currentText()},'Codend','" +
                 f"{self.sbeLocation}','{self.serialNumber}')")
 
             #  show the progress dialog
@@ -746,7 +795,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
 
         ship = self.shipLabel.text()
         survey = self.surveyLabel.text()
-        haul = self.haulLabel.text()
+        haul = self.cb_haulLabel.currentText()
         p = 'MainTrawl'
         avgTemp = float('nan')
         avgDepth = float('nan')
