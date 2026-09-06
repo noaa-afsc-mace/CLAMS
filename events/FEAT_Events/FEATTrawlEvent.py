@@ -744,12 +744,14 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
                                             f"WHERE ship={self.ship} AND survey={self.survey} "
                                             f"AND event_id={self.activeEvent} AND partition='MainTrawl' "
                                             f"AND event_parameter='TDRLatitude'")
-            if not tdr_lat_check.first():
+            lat_check = tdr_lat_check.first()
+            if not lat_check or not lat_check[0]:
                 #  extract the lat/lon
-                lat = self.dispVector[0]
-                self.db.dbExec(f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
-                               f"event_parameter, parameter_value) VALUES ({self.ship}, {self.survey}, "
-                               f"{self.activeEvent}, 'MainTrawl', 'TDRLatitude', '{lat}')")
+                lat = self.dispVector.get(0, '')
+                if lat:
+                    self.db.dbExec(f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
+                                   f"event_parameter, parameter_value) VALUES ({self.ship}, {self.survey}, "
+                                   f"{self.activeEvent}, 'MainTrawl', 'TDRLatitude', '{lat}')")
             # if TD is pressed, send up net dimensions
             self.net_btn = 'TD'
             self.get_net_dims()
