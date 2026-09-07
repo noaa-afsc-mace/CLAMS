@@ -385,13 +385,33 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.subcategories.append(subcategory)
 
         # set up device sounds
-        #self.loadDeviceSounds()
+        self.loadDeviceSounds()
 
         #  reload the species list - this populates the species list
         self.reloadSamplesList()
 
 
         self.updateParentKeys()
+
+    def loadDeviceSounds(self):
+        """Loads QSoundEffect objects for all configured devices into self.sounds."""
+        self.sounds = {}
+
+        # load sounds for all devices
+        sql = (f"SELECT device_id, parameter_value FROM {self.schema}.device_configuration "
+               f"WHERE device_parameter='SoundFile'")
+        query = self.db.dbQuery(sql)
+
+        for dev_id, sound_file in query:
+            if sound_file:
+                # Ensure the path is correct and has a .wav extension
+                if not sound_file.lower().endswith('.wav'):
+                    sound_file += '.wav'
+                sound_path = os.path.join(self.settings['SoundsDir'], sound_file)
+
+                effect = QSoundEffect()
+                effect.setSource(QUrl.fromLocalFile(sound_path))
+                self.sounds[str(dev_id)] = effect
 
 
     def getSpecies(self):
@@ -840,10 +860,6 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.manualFlag = False
         self.activeDeviceId = self.deviceData[device_name]['id']
 
-        #  play the sound associated with this device if provided
-        if self.deviceData[device_name]['soundeffect']:
-            self.deviceData[device_name]['soundeffect'].play()
-
         #  do some basic checks, get the basket type, then insert into the database
         self.updateBasket()
 
@@ -948,6 +964,10 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         # update the GUI
         self.updateTables()
+
+        # play the specific sound for whichever device sent the weight
+        if str(self.activeDeviceId) in self.sounds:
+            self.sounds[str(self.activeDeviceId)].play()
 
         #  we're done with this basket - unfreeze
         self.freeze = False
