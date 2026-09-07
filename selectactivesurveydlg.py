@@ -145,20 +145,20 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
 
                 #  reset the sequences for the new ship/survey combo. This sets the sequence values
                 #  to whatever is appropriate for this ship/survey.
-                sql = ("CALL reset_sequence_by_survey('baskets', 'basket_id'," +
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('baskets', 'basket_id'," +
                         self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
                 self.db.dbExec(sql)
 
-                sql = ("CALL reset_sequence_by_survey('samples', 'sample_id'," +
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('samples', 'sample_id'," +
                         self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
                 self.db.dbExec(sql)
 
-                sql = ("CALL reset_sequence_by_survey('specimen', 'specimen_id'," +
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('specimen', 'specimen_id'," +
                         self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
                 self.db.dbExec(sql)
 
                 #  reset the protected spp event ID sequence - new in 2019
-                sql = ("CALL reset_sequence_by_survey('protected_spp_events', 'event_id'," +
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('protected_spp_events', 'event_id'," +
                         self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
                 self.db.dbExec(sql)
 
