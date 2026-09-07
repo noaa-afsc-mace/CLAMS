@@ -826,7 +826,7 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
             # the first measurement assigned to this device
             measurement = self.deviceData[device_name]['measurements']['trawlevent'][0]
             # check that we have data for this sensor
-            if data is None or data.strip() == '':
+            if data is None or data.strip() == '' or '-Unknown-' in data:
                 return
 
             # convert Lat/Lon to decimal degrees
