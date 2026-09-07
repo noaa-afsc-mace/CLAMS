@@ -395,7 +395,6 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
     def loadDeviceSounds(self):
         """Loads QSoundEffect objects for all configured devices into self.sounds."""
-        self.sounds = {}
 
         # load sounds for all devices
         sql = (f"SELECT device_id, parameter_value FROM {self.schema}.device_configuration "
@@ -413,7 +412,13 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 effect.setSource(QUrl.fromLocalFile(sound_path))
                 self.sounds[str(dev_id)] = effect
 
+        # load for manual device id
+        source = os.path.join(self.settings['SoundsDir'], 'KARATE.wav')
+        man_effect = QSoundEffect()
+        man_effect.setSource(QUrl.fromLocalFile(source))
+        self.sounds['0'] = man_effect
 
+        
     def getSpecies(self):
         '''getSpecies is called when the Add Species button is pressed and it pauses
         device input and displays the add species dialog.
