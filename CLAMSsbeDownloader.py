@@ -804,7 +804,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         fishing_params = "'EQ', 'TD', 'TargetDepth'"
         query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
                               f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
-                              f"AND event_parameter IN ({fishing_params})")
+                              f"AND event_parameter IN ({fishing_params}) AND parameter_value LIKE '_______ __:__:__%'")
         eq_result = query.first()
         eqTime = eq_result[0] if eq_result else None
 
@@ -812,7 +812,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
         stop_params = "'HB', 'Haulback'"
         query=self.db.dbQuery(f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={ship} "
                               f"AND survey={survey} AND event_id= {haul} AND partition='{p}' "
-                              f"AND event_parameter IN ({stop_params})")
+                              f"AND event_parameter IN ({stop_params}) AND parameter_value LIKE '_______ __:__:__%'")
         hb_result = query.first()
         hbTime = hb_result[0] if hb_result else None
 
