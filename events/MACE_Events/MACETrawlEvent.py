@@ -1616,13 +1616,13 @@ class Event(QDialog, ui_MACETrawlEvent.Ui_MACETrawlEvent):
                 self.sensorMonitor.stopMonitoring()
 
                 # update haul type
-                sql = ("UPDATE events SET event_type = "+self.typeCode[self.typeBox.currentIndex()]+
+                sql = ("UPDATE " + self.schema + ".events SET event_type = "+self.typeCode[self.typeBox.currentIndex()]+
                         " WHERE ship="+self.ship+ " AND survey="+self.survey+" AND event_id="+self.activeEvent)
                 self.db.dbExec(sql)
 
                 # update performance
                 if  self.perfBox.currentIndex() != -1:
-                    sql = ("UPDATE events SET performance_code = " +
+                    sql = ("UPDATE " + self.schema + ".events SET performance_code = " +
                             self.perfCode[self.perfBox.currentIndex()]+" WHERE ship="+self.ship+
                             " AND survey="+self.survey+" AND event_id="+self.activeEvent)
                     self.db.dbExec(sql)

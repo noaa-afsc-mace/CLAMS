@@ -36,10 +36,10 @@ class AdminLoginDlg(QtGui.QDialog, ui_AdminLoginDlg.Ui_AdminLoginDlg):
 
 
     def okClicked(self):
-        query = self.db.dbQuery("SELECT parameter_value from application_configuration WHERE " +
+        query = self.db.dbQuery("SELECT parameter_value from " + self.schema + ".application_configuration WHERE " +
                 "application_parameter='AdminPassword'")
         password = query[0]
-        query = self.db.dbQuery("SELECT parameter_value from application_configuration WHERE " +
+        query = self.db.dbQuery("SELECT parameter_value from " + self.schema + ".application_configuration WHERE " +
                 "application_parameter='AdminSalt'")
         salt = query[0]
 

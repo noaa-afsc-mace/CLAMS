@@ -2,14 +2,13 @@
 #  add the UI files directory to the python path
 import sys
 import os
-MCLPath = reduce(lambda l,r: l + os.path.sep + r, os.path.dirname(os.path.realpath(__file__)).split(os.path.sep))
-sys.path.append(os.path.join(MCLPath, 'ui'))
 
 #  import packages
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4 import QtSql
-from ui.xga import ui_CLAMSEdit
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from PyQt6.QtWidgets import *
+from PyQt6 import QtSql
+from ui import ui_CLAMSEdit
 import eventseldlg
 
 class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
@@ -19,10 +18,11 @@ class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
         super(CLAMSEdit, self).__init__(parent)
         self.setupUi(self)
         self.db=parent.db
-        self.dataModel=QtSql.QSqlRelationalTableModel(self.dataView, self.db)
-        self.dataModel.setEditStrategy(QtSql.QSqlTableModel.OnManualSubmit)
-        self.dataView.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.dataView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.schema = parent.schema
+        self.dataModel=QtSql.QSqlRelationalTableModel(self.dataView)
+        #self.dataModel.setEditStrategy(QtSql.QSqlTableModel.OnManualSubmit)
+        #self.dataView.setSelectionMode(QAbstractItemView.SingleSelection)
+        #self.dataView.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         # some other data
         self.ship=parent.parent().ship
@@ -52,34 +52,36 @@ class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
         self.deleteRow=None
         # set up button colors
         self.red=QPalette()
-        self.red.setColor(QPalette.Button,QColor(230,0, 0))
-        self.red.setColor(QPalette.ButtonText,QColor(230, 0, 0))
+        #self.red.setColor(QPalette.button,QColor(230,0, 0))
+        #self.red.setColor(QPalette.buttonText,QColor(230, 0, 0))
         self.green=QPalette()
-        self.green.setColor(QPalette.Button,QColor(0, 230, 0))
-        self.green.setColor(QPalette.ButtonText,QColor(0, 230, 0))
+        #self.green.setColor(QPalette.button,QColor(0, 230, 0))
+        #self.green.setColor(QPalette.buttonText,QColor(0, 230, 0))
 
         self.commitBtn.setPalette(self.green)
 
-        self.connect(self.insertBtn, SIGNAL("clicked()"), self.goInsert)
-        self.connect(self.commitBtn, SIGNAL("clicked()"), self.goCommit)
-        self.connect(self.cancelBtn, SIGNAL("clicked()"), self.goCancel)
-        self.connect(self.filterBtn, SIGNAL("clicked()"), self.getFilter)
-        self.connect(self.deleteBtn, SIGNAL("clicked()"), self.goDelete)
-        self.connect(self.clearHaulBtn, SIGNAL("clicked()"), self.clearHaul)
-        self.connect(self.tableTypeBox, SIGNAL("activated(int)"), self.chooseTables)
-        self.connect(self.dataModel, SIGNAL("dataChanged(QModelIndex,QModelIndex)"), self.commitColor)
+        self.insertBtn.clicked.connect(self.goInsert)
+
+        self.insertBtn.clicked.connect(self.goInsert)
+        self.commitBtn.clicked.connect(self.goCommit)
+        self.cancelBtn.clicked.connect(self.goCancel)
+        self.filterBtn.clicked.connect(self.getFilter)
+        self.deleteBtn.clicked.connect(self.goDelete)
+        self.clearHaulBtn.clicked.connect(self.clearHaul)
+        #self.connect(self.tableTypeBox, SIGNAL("activated(int)"), self.chooseTables)
+        #self.connect(self.dataModel, SIGNAL("dataChanged(QModelIndex,QModelIndex)"), self.commitColor)
 
         # for right now...
-        self.loadBtn.setEnabled(True)
+        #self.loadBtn.setEnabled(True)
 
 
     def runSql(self):
         try:
             query=QtSql.QSqlQuery(str(self.textEdit.toPlainText()))
             if not query.isValid():
-                MessageBox.warning(self, "ERROR", "<font size = 14> Query is no good!</font>")
+                QMessageBox.warning(self, "ERROR", "<font size = 14> Query is no good!</font>")
         except:
-            MessageBox.warning(self, "ERROR", "<font size = 14> Query is no good!</font>")
+            QMessageBox.warning(self, "ERROR", "<font size = 14> Query is no good!</font>")
 
 
     def chooseTables(self):
@@ -95,7 +97,7 @@ class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
                 self.tableBox.addItem(i)
 
         self.tableBox.setCurrentIndex(-1)
-        self.connect(self.tableBox, SIGNAL("activated(int)"), self.showTable)
+        #self.tableBox, SIGNAL("activated(int)"), self.showTable)
 
 
     def showTable(self):
@@ -185,7 +187,7 @@ class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
 
 
     def clearHaul(self):
-        query=QtSql.QSqlQuery("SELECT EVENT_ID, PARAMETER_VALUE FROM EVENT_DATA  WHERE ship = "+self.ship+ " AND survey="+self.survey+" AND EVENT_PARAMETER = 'EQ' "  )
+        query=QtSql.QSqlQuery("SELECT EVENT_ID, PARAMETER_VALUE FROM " + self.schema + ".EVENT_DATA  WHERE ship = "+self.ship+ " AND survey="+self.survey+" AND EVENT_PARAMETER = 'EQ' "  )
         Hauls=[]
         EQTimes=[]
         while query.next():
@@ -205,15 +207,15 @@ class CLAMSEdit(QDialog, ui_CLAMSEdit.Ui_clamsEdit):
             return
 
 
-        QtSql.QSqlQuery("DELETE FROM measurements WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM specimen WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM basket WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM sample_data WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM sample WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM event_data WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM event_stream_data WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM gear_accessory WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
-        QtSql.QSqlQuery("DELETE FROM events WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".measurements WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".specimen WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".basket WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".sample_data WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".sample WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".event_data WHERE ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".event_stream_data WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".gear_accessory WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
+        QtSql.QSqlQuery("DELETE FROM " + self.schema + ".events WHERE  ship="+self.ship+" AND survey="+self.survey+" AND event_id ="+self.activeHaul)
 
 
 

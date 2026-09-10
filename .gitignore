@@ -5,6 +5,7 @@ clams.ini
 clamsABL.ini
 clams_NWFSC.ini
 clams_swfsc.ini
+sensor_data_tools/
 *.log
 *.bak
 #*.wav

@@ -94,6 +94,7 @@ class catchHome(QDialog, ui_CPSCatchHome.Ui_CPSCatchHome):
 
     def getUnsorted(self):
         #  show the catch form
+        self.close()
         unsorted = unsortedCatch.unsortedCatch(self)
         unsorted.exec()
 

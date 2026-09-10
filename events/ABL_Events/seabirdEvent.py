@@ -1028,7 +1028,7 @@ class seabirdEvent(QDialog, ui_ABLTrawlEvent.Ui_ABLTrawlEvent):
 
             # Haul Table
             # update performance and haul type
-            query = QtSql.QSqlQuery("UPDATE events SET event_type = "+self.typeCode[self.typeBox.currentIndex()]+
+            query = QtSql.QSqlQuery("UPDATE " + self.schema + ".events SET event_type = "+self.typeCode[self.typeBox.currentIndex()]+
                     " WHERE ship="+self.ship+
                     " AND survey="+self.survey+" AND event_id="+self.activeEvent)
             self.backLogger.info(QDateTime.currentDateTime().toString('MMddyyyy hh:mm:ss')+","+query.lastQuery())

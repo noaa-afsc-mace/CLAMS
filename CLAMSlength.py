@@ -561,6 +561,45 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         Re-query the data from the database to display what has been saved.
         '''
 
+        # added/cleaned by Alicia Billings 4/2/26
+        where_clauses = [
+            f"m.measurement_type IN ('{self.len_type}')",
+            f"m.ship = {self.ship}",
+            f"m.survey = {self.survey}",
+            f"m.event_id = {self.activeHaul}",
+            f"m.sample_id = {self.sampleKey}",
+            "s.protocol_name = 'Length_Sex'"
+        ]
+        if not self.admin:
+            where_clauses.append(f"s.workstation_id = {self.workStation}")
+        final_where_str = " AND ".join(where_clauses)
+
+        sql = f"""
+                    SELECT
+                        a.length,
+                        b.sex
+                    FROM (
+                        SELECT m.ship, m.survey, m.event_id, m.specimen_id, m.measurement_value AS length
+                        FROM {self.schema}.measurements m
+                        JOIN {self.schema}.specimen s ON
+                            m.ship = s.ship
+                            AND m.survey = s.survey
+                            AND m.event_id = s.event_id 
+                            AND m.specimen_id = s.specimen_id
+                        WHERE {final_where_str}
+                    ) a
+                    LEFT OUTER JOIN (
+                        SELECT ship, survey, event_id, specimen_id, measurement_value AS sex
+                        FROM {self.schema}.measurements
+                        WHERE measurement_type = 'sex'
+                    ) b ON
+                        b.ship = a.ship
+                        AND b.survey = a.survey
+                        AND b.event_id = a.event_id
+                        AND b.specimen_id = a.specimen_id
+                    ORDER BY a.specimen_id ASC
+                """
+        """
         if self.admin:
             sql = ("SELECT a.specimen_id, a.length, b.sex "+
                     " FROM "+
@@ -616,7 +655,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                   " AND b.survey = a.survey "+
                   " AND b.event_id = a.event_id "+
                   " AND b.specimen_id = a.specimen_id) ORDER BY a.specimen_id")
-
+        """
         self.measureModel.setQuery(sql, self.db.db)
 
         #TODO: Manually add headers and data to a QTableView instead of the QSqlModelView
@@ -637,6 +676,44 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         for i in range(80):
             self.lmax.append(0.)
 
+        # added/cleaned by Alicia Billings 4/2/26
+        where_clauses = [
+            f"m.measurement_type IN ('{self.len_type}')",
+            f"m.ship = {self.ship}",
+            f"m.survey = {self.survey}",
+            f"m.event_id = {self.activeHaul}",
+            f"m.sample_id = {self.sampleKey}",
+            "s.protocol_name = 'Length_Sex'"
+        ]
+        if not self.admin:
+            where_clauses.append(f"s.workstation_id = {self.workStation}")
+        final_where_str = " AND ".join(where_clauses)
+
+        sql = f"""
+            SELECT
+                a.length,
+                b.sex
+            FROM (
+                SELECT m.ship, m.survey, m.event_id, m.specimen_id, m.measurement_value AS length
+                FROM {self.schema}.measurements m
+                JOIN {self.schema}.specimen s ON
+                    m.ship = s.ship
+                    AND m.survey = s.survey
+                    AND m.event_id = s.event_id 
+                    AND m.specimen_id = s.specimen_id
+                WHERE {final_where_str}
+            ) a
+            LEFT OUTER JOIN (
+                SELECT ship, survey, event_id, specimen_id, measurement_value AS sex
+                FROM {self.schema}.measurements
+                WHERE measurement_type = 'sex'
+            ) b ON
+                b.ship = a.ship
+                AND b.survey = a.survey
+                AND b.event_id = a.event_id
+                AND b.specimen_id = a.specimen_id
+        """
+        """
         # if we are under admin (on an administrative station), select ALL lengths
         if self.admin:
             sql = ("SELECT a.length, b.sex "+
@@ -695,7 +772,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
                   " AND b.survey = a.survey "+
                   " AND b.event_id = a.event_id "+
                   " AND b.specimen_id = a.specimen_id)")
-
+        """
         query = self.db.dbQuery(sql)
         self.scale = 1.
         # make the plot with the length and sex data from the query
@@ -833,17 +910,16 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         '''
         # if this is admin (an administrative workstation), query ALL lengths
         if self.admin:
-            sql = ("SELECT count(specimen_id), SEX "+
-                " FROM V_SPECIMEN_MEASUREMENTS  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+
-                "AND PROTOCOL_NAME='Length_Sex' GROUP BY SEX ")
+            sql = ("SELECT count(specimen_id), sex FROM " + self.schema + ".v_specimen_measurements WHERE ship = "
+                   + self.ship + " AND survey = " + self.survey + " AND event_id = " + self.activeHaul +
+                   " AND sample_id = " + self.sampleKey + " AND protocol_name = 'Length_Sex' GROUP BY sex")
             query = self.db.dbQuery(sql)
         # otherwise, if not admin, query the lengths from just the current workstation
         else:
-            sql=("SELECT count(specimen_id), SEX "+
-                " FROM V_SPECIMEN_MEASUREMENTS  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND SAMPLE_ID = "+self.sampleKey+"  AND "+
-                " WORKSTATION_ID = "+self.workStation+" AND PROTOCOL_NAME='Length_Sex'  GROUP BY SEX ")
+            sql=("SELECT count(specimen_id), sex FROM " + self.schema + ".v_specimen_measurements  WHERE ship = "
+                 + self.ship + " AND survey = " + self.survey + " AND event_id = " + self.activeHaul +
+                 " AND sample_id = " + self.sampleKey + " AND workstation_id = " + self.workStation
+                 + " AND protocol_name = 'Length_Sex' GROUP BY sex")
             query = self.db.dbQuery(sql)
         counts = []
         # Initialize the table to 0

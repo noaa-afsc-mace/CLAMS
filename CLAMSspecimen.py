@@ -87,6 +87,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.sqlLengthIndex = None
         self.freeze=False
         self.schema = parent.schema
+        self.length_types = parent.length_types
 
         if not self.db.db.isOpen():
             self.db.dbOpen()
@@ -159,8 +160,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 #  initialize the Label Printer
                 self.printer = ZebraLabelPrinter.ZebraLabelPrinter(self.sensorMonitor,
                         self.deviceData['Label_Printer']['id'])
-
-            sound_file = self.deviceData['Label_Printer']['soundeffect']
+            try:
+                sound_file = self.deviceData['Label_Printer']['soundeffect']
+            except KeyError:
+                sound_file = None
             if sound_file:
                 hasExt = sound_file.split('.')
                 if len(hasExt) > 1:
@@ -271,6 +274,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.printBtn.setEnabled(enabled)
         self.measureView.setEnabled(enabled)
 
+        if 'nwfsc' in self.settings['OrganizationName'].lower() or \
+                'swfsc' in self.settings['OrganizationName'].lower():
+            self.collectBtn.hide()
+            self.printBtn.setText('Print Label')
 
 
     def serialIOFilter(self):
@@ -457,6 +464,13 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
     def getProtocol(self):
         '''getProtocol prompts the user to select a protocol for the currently active species.
         '''
+        # added 6/9/26 - get protocols that are only group_collection
+        g_protos = []
+        gc_sql = (f"SELECT protocol_name FROM {self.schema}.protocol_definitions "
+                  f"WHERE measurement_type='group_collection'")
+        gc_query = self.db.dbQuery(gc_sql)
+        for p_name, in gc_query:
+            g_protos.append(p_name)
 
         #  build a list of the active protocols for this species
         self.protocols = []
@@ -465,8 +479,10 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 self.activeSpcCode + " AND subcategory= '"+self.activeSpcSubcat +"' AND active=1")
         query = self.db.dbQuery(sql)
         for protocol_name,  in query:
-            nProtocols = nProtocols + 1
-            self.protocols.append(protocol_name)
+            # added 6/9/26 - only add if not a group collection protocol
+            if protocol_name not in g_protos:
+                nProtocols = nProtocols + 1
+                self.protocols.append(protocol_name)
 
         if nProtocols == 0:
             QMessageBox.information(self, "Huh...", "<font size = 12>There are no protocols defined " +
@@ -655,7 +671,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             #  check if this is a manually entered value or from a device
             if (self.manualFlag):
-                if (self.measureType[i] == 'alpha_barcode'):
+                if (self.measureType[i] == 'alpha_barcode' or self.measureType[i] == 'stomach_barcode'):
                     #  this value is entered manually - display the swfsc number pad
                     keyDialog = swfscbarcodenumpad.SWFSCBarcodeNumpad(self.values[i], self)
                     keyDialog.msgLabel.setText("Enter " + self.measureType[i])
@@ -802,15 +818,20 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             #  process the result
             result = current_dialog.result
 
-            #  check if we got a value from the dialog
-            if result[0]:
-                val = result[1]
+            # updated 6/3/26 to check if return is a dict object
+            if isinstance(result, dict):
+                if list(result.items())[0][1]:
+                    val = result
             else:
-                return
+                #  check if we got a value from the dialog
+                if result[0]:
+                    val = result[1]
+                else:
+                    return
         else:
             #  check if this is a manually entered value or from a device
             if self.manualFlag:
-                if (self.measureType[i] == 'alpha_barcode'):
+                if (self.measureType[i] == 'alpha_barcode' or self.measureType[i] == 'stomach_barcode'):
                     #  this value is entered manually - display the swfsc number pad
                     keyDialog = swfscbarcodenumpad.SWFSCBarcodeNumpad(self.values[i], self)
                     keyDialog.msgLabel.setText("Enter " + self.measureType[i])
@@ -858,7 +879,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             valObj = valObj(self.db, self.schema, self.activeSpcCode)
             # perform the validation
             result = valObj.validate(val, self.measureType, self.values)
-            if not result[0] and not result[0] == None:
+            if not result[0] and not result[0] is None:
                 # validation failed - ask if user wants to redo or override
                 self.message.setMessage(self.errorIcons[1],self.errorSounds[1], result[1], 'choice')
                 if self.message.exec():
@@ -946,28 +967,79 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         '''
 
         #  check if this is the first measurement for this specimen
-        if (self.specimenKey == None):
+        if self.specimenKey is None:
             # first measurement - get a specimen key
             self.getNewSpecimen()
 
         #  disable the protocol change button - only can change protocols
         #  when you're not in the middle of processing a specimen
         self.protoBtn.setEnabled(False)
-        #  change the button text to green
-        self.buttons[i].setStyleSheet("background-color: green")
-        if self.measureType[i] == 'length':
+        if self.measureType[i] in self.length_types:
             measure_type = self.lengthTypeBox.currentText()
         else:
             measure_type = self.measureType[i]
 
         #  check if we're editing (overwriting) a record or inserting a new one
         if self.editFieldFlag:
-            # overwrite record - UPDATE
-            sql =("UPDATE " + self.schema + ".measurements SET measurement_value ='" + self.values[i] + "' WHERE  ship="+
-                    self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                    " AND sample_id="+self.activeSample+" AND specimen_id = " +self.specimenKey +
-                    " AND measurement_type = '" + measure_type+"'")
-            self.db.dbExec(sql)
+            # added 6/3/26 to deal with multiple entries coming from dialog (ordered dict)
+            if isinstance(self.values[i], dict):
+                all_types = ", ".join(f"'{w}'" for w in self.values[i].keys())
+                other_types = ""
+
+                # todo: this shouldn't be hard coded here, but this will need to be tackled later
+                if 'diet_collection' in self.values[i]:
+                    other_types = "'stomach_collect', 'stom_cont_1', 'stom_cont_2', 'stom_cont_3', 'stom_vol_1', " \
+                                  "'stom_vol_2', 'stom_vol_3', 'stom_overall_wt'"
+                elif 'gonad_collection' in self.values[i]:
+                    other_types = "'gonad_weight', 'gonad_collect'"
+                elif 'luck_meas' in self.values[i]:
+                    other_types = "'gonad_rna', 'liver_rna', 'liver_taken'"
+
+                for measure_type, value in self.values[i].items():
+                    # for some of the dict values, they may need to be deleted or inserted; not just updated
+                    # check for orphan records
+                    orphan_sql = (f"SELECT measurement_type FROM {self.schema}.measurements WHERE ship={self.ship} "
+                                  f"AND survey={self.survey} AND event_id={self.activeHaul} "
+                                  f"AND sample_id={self.activeSample} AND specimen_id={self.specimenKey} "
+                                  f"AND measurement_type NOT IN ({all_types})")
+                    if other_types:
+                        orphan_sql += f" AND measurement_type IN ({other_types})"
+                    orphan_query = self.db.dbQuery(orphan_sql)
+                    for row in orphan_query:
+                        orphan_val = str(orphan_query.value(0))
+                        del_sql = (f"DELETE FROM {self.schema}.measurements WHERE ship={self.ship} "
+                                   f"AND survey={self.survey} AND event_id={self.activeHaul} "
+                                   f"AND sample_id={self.activeSample} AND specimen_id={self.specimenKey} "
+                                   f"AND measurement_type = '{orphan_val}'")
+                        self.db.dbExec(del_sql)
+
+                    # check for existing record
+                    exist_sql = (f"SELECT * FROM {self.schema}.measurements WHERE ship={self.ship} "
+                                 f"AND survey={self.survey} AND event_id={self.activeHaul} "
+                                 f"AND sample_id={self.activeSample} AND specimen_id={self.specimenKey} "
+                                 f"AND measurement_type = '{measure_type}'")
+                    exist_query = self.db.dbQuery(exist_sql)
+
+                    if exist_query.first():
+                        query_txt = (f"UPDATE {self.schema}.measurements SET measurement_value ='{value}'"
+                                     f" WHERE ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul} "
+                                     f"AND sample_id={self.activeSample} AND specimen_id={self.specimenKey} "
+                                     f"AND measurement_type = '{measure_type}'")
+                        self.db.dbExec(query_txt)
+                    else:
+                        query_txt = (f"INSERT INTO {self.schema}.measurements (ship, survey, event_id, sample_id, specimen_id, "
+                                     f"measurement_type, device_id, measurement_value) VALUES ({self.ship}, "
+                                     f"{self.survey}, {self.activeHaul}, {self.activeSample}, {self.specimenKey}, "
+                                     f"'{measure_type}', {device_id}, '{value}')")
+                        self.db.dbE(query_txt)
+
+            else:
+                # overwrite record - UPDATE
+                sql =("UPDATE " + self.schema + ".measurements SET measurement_value ='" + self.values[i] + "' WHERE  ship="+
+                        self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
+                        " AND sample_id="+self.activeSample+" AND specimen_id = " +self.specimenKey +
+                        " AND measurement_type = '" + measure_type+"'")
+                self.db.dbExec(sql)
 
             # update table
             self.updateMeasureView()
@@ -976,12 +1048,22 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.checkConditionals()
 
         else:
-            #  this is a new record - INSERT
-            sql = ("INSERT INTO " + self.schema + ".measurements (ship, survey, event_id, sample_id, specimen_id, " +
-                    "measurement_type, device_id, measurement_value) VALUES (" +self.ship+","+
-                    self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey +
-                    ",'" + measure_type + "'," + device_id + ",'" + self.values[i] + "')")
-            self.db.dbExec(sql)
+            if isinstance(self.values[i], dict):
+                # added 6/3/26 to deal with multiple entries from same dialog
+                if isinstance(self.values[i], dict):
+                    for measure_type, value in self.values[i].items():
+                        query_txt = (f"INSERT INTO {self.schema}.measurements (ship, survey, event_id, sample_id, "
+                                     f"specimen_id, measurement_type, device_id, measurement_value) "
+                                     f"VALUES ({self.ship}, {self.survey}, {self.activeHaul}, {self.activeSample}, "
+                                     f"{self.specimenKey}, '{measure_type}', {device_id}, '{value}')")
+                        self.db.dbExec(query_txt)
+            else:
+                #  this is a new record - INSERT
+                sql = ("INSERT INTO " + self.schema + ".measurements (ship, survey, event_id, sample_id, specimen_id, " +
+                        "measurement_type, device_id, measurement_value) VALUES (" +self.ship+","+
+                        self.survey+","+self.activeHaul+ ","+self.activeSample+","+ self.specimenKey +
+                        ",'" + measure_type + "'," + device_id + ",'" + self.values[i] + "')")
+                self.db.dbExec(sql)
 
             # update table
             self.updateMeasureView()
@@ -991,6 +1073,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             if keepGoing:
                 self.moveOn(i)
+        
+        #  change the button text to green
+        self.buttons[i].setStyleSheet("background-color: green")
 
 
     def moveOn(self, i):
@@ -1025,17 +1110,37 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.buttonEnable = []
 
             for i in self.iterator:
-                self.buttonEnable.append(True)
+                self.buttonEnable.append([True, False])
 
             for condObj in self.conditionals:
-                condObj = condObj(self.db)
+                condObj = condObj(self.db, self.schema, self.activeSpcCode, self)
                 self.buttonEnable = condObj.evaluate(self.measureType,  self.values, self.buttonEnable)
 
             for i in self.iterator:
                 btn = self.buttons[i]
-                btn.setEnabled(self.buttonEnable[i])
-                if not self.buttonEnable[i]:
+                # added by AB to re-enable buttons that already have measurement
+                if self.values[i] is not None:
+                    self.buttonEnable[i][0] = True
+
+                btn.setEnabled(self.buttonEnable[i][0])
+                if not self.buttonEnable[i][0]:
                     btn.setStyleSheet("background-color: gray")
+
+                # added by AB to reset the button color if the measure is enabled and there is no value yet
+                elif self.buttonEnable[i][0] and self.values[i] is None:
+                    if self.forcing[i] == '1':
+                        btn.setStyleSheet("background-color: red")
+                    else:
+                        btn.setStyleSheet("background-color: yellow")
+
+                if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
+                    self.forcing[i] = '1'
+                    # Only turn the button red if a measurement hasn't been taken yet.
+                    # Otherwise, ensure it stays green.
+                    if self.values[i] is None:
+                        btn.setStyleSheet("background-color: red")
+                    else:
+                        btn.setStyleSheet("background-color: green")
 
 
     def getNext(self, skipChecks=False):
@@ -1098,6 +1203,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         for i in self.iterator:
             self.values[i] = None
             self.buttons[i].setEnabled(True)
+            self.forcing[i] = self.origForcing[i]
+
         #  reset the specimen key
         self.specimenKey = None
         self.specimenLabel.setText('')
@@ -1167,13 +1274,13 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         if (self.sqlLengthIndex != None):
             #  create the SQL string based on the current length type
             length_type = str(self.lengthTypeBox.currentText())
-            sqlStringEnd=' AND '+length_type+' IS NOT NULL '
+            sqlStringEnd = ' AND ' + length_type + ' IS NOT NULL '
             #  insert the current length type
             self.sqlString[self.sqlLengthIndex] = length_type
         else:
             # For this case, the sqlString will already be formatted correctly because the length types were established in the protocol
             # And we want all of the specimens for that sample and protocol, so no ending sql string is needed- set it to one space string
-            sqlStringEnd=' '
+            sqlStringEnd = ' '
 
         #  create the string
         sqlString = ','.join(self.sqlString)
@@ -1181,23 +1288,20 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         #  set the model view SQL
         if self.admin:
             #  admin mode shows all measurements
-            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM " + self.schema + 
-                   ".V_SPECIMEN_MEASUREMENTS WHERE " +
-                    "ship="+self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                    " AND sample_id="+self.activeSample+"  AND " +
-                    "PROTOCOL_NAME = '" + self.protocol +"'" + sqlStringEnd +
-                    "ORDER BY SPECIMEN_ID")
+            sql = ("SELECT specimen_id, " + sqlString + ", sampling_method FROM " + self.schema +
+                   ".v_specimen_measurements WHERE ship = " + self.ship + " AND survey = " + self.survey +
+                   " AND event_id = " + self.activeHaul + " AND sample_id = " + self.activeSample +
+                   " AND protocol_name = '" + self.protocol +"'" + sqlStringEnd +
+                    "ORDER BY specimen_id")
             self.measureModel.setQuery(sql, self.db.db)
         else:
             #  regular mode shows only measurements at that station
-            sql = ("SELECT SPECIMEN_ID, "+ sqlString + ",SAMPLING_METHOD" + " FROM " + self.schema + 
-                   ".V_SPECIMEN_MEASUREMENTS WHERE " +
-                  "ship="+self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                  " AND sample_id="+self.activeSample+
-                  " AND PROTOCOL_NAME = '" + self.protocol + "' AND WORKSTATION_ID = " +
-                  self.workStation + sqlStringEnd + "ORDER BY SPECIMEN_ID")
+            sql = ("SELECT specimen_id, " + sqlString + ", sampling_method FROM " + self.schema +
+                   ".v_specimen_measurements WHERE ship = " + self.ship + " AND survey = " + self.survey +
+                   " AND event_id = " + self.activeHaul + " AND sample_id = " + self.activeSample +
+                   " AND protocol_name = '" + self.protocol + "' AND workstation_id = " +
+                  self.workStation + sqlStringEnd + "ORDER BY specimen_id")
             self.measureModel.setQuery(sql, self.db.db)
-
 
         self.measureView.scrollToBottom()
 
@@ -1254,6 +1358,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.measureType = []
 
         self.forcing = []
+        self.origForcing = []
         self.forceOrder = []
         self.label = []
         self.dialogs = []
@@ -1270,16 +1375,35 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.sounds = []
 
         # get the measurements for this species
-        sql = ("SELECT PROTOCOL_DEFINITIONS.MEASUREMENT_TYPE, MEASUREMENT_SETUP.DEVICE_ID," +
-                "DEVICES.DEVICE_INTERFACE,PROTOCOL_DEFINITIONS.FORCE_MEASUREMENT," +
-                "PROTOCOL_DEFINITIONS.FORCE_ORDER,PROTOCOL_DEFINITIONS.LABEL " +
-                "FROM " + self.schema + ".MEASUREMENT_SETUP JOIN " + self.schema + ".PROTOCOL_DEFINITIONS " +
-                "ON PROTOCOL_DEFINITIONS.MEASUREMENT_TYPE=MEASUREMENT_SETUP.MEASUREMENT_TYPE " +
-                "JOIN " + self.schema + ".DEVICES ON DEVICES.DEVICE_ID=MEASUREMENT_SETUP.DEVICE_ID " +
-                "WHERE PROTOCOL_DEFINITIONS.PROTOCOL_NAME='"+self.protocol+"' AND " +
-                "MEASUREMENT_SETUP.WORKSTATION_ID="+self.workStation+" AND  " +
-                "MEASUREMENT_SETUP.GUI_MODULE='Specimen' " +
-                "ORDER BY PROTOCOL_DEFINITIONS.MEASUREMENT_ORDER ASC")
+        where_clauses = [
+            f"p.protocol_name = '{self.protocol}'",
+            f"m.workstation_id = {self.workStation}",
+            "m.gui_module = 'Specimen'"
+        ]
+        # check if the active column is in the database
+        # updated for NWC and SWC to allow for an active column in protocol_definitions
+        try:
+            self.db.dbQuery(f"SELECT active FROM {self.schema}.PROTOCOL_DEFINITIONS WHERE 1=0")
+            where_clauses.append("p.active = 1")
+        except:
+            pass
+        final_where = " AND ".join(where_clauses)
+
+        sql = f"""
+            SELECT 
+               p.measurement_type,
+               m.device_id,
+               d.device_interface,
+               p.force_measurement,
+               p.force_order,
+               p.label
+            FROM {self.schema}.MEASUREMENT_SETUP m
+            JOIN {self.schema}.PROTOCOL_DEFINITIONS p
+                ON p.measurement_type = m.measurement_type
+            JOIN {self.schema}.devices d
+                ON d.device_id = m.device_id
+            WHERE {final_where}
+            ORDER BY p.measurement_order ASC"""
         query = self.db.dbQuery(sql)
 
         #  Initialize length type combo box to disabled until you encounter a 'length' in the protocol
@@ -1315,6 +1439,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             #  one we encounter.
             if len(self.forcing) <= idx:
                 self.forcing.append(force_measurement)
+                self.origForcing.append(force_measurement)
             if len(self.forceOrder) <= idx:
                 self.forceOrder.append(force_order)
             if len(self.label) <= idx:
@@ -1393,17 +1518,33 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 self.dialogs.append(thisDialog)
 
             # get validations
-            sql1 = ("SELECT VALIDATION FROM " + self.schema + ".VALIDATIONS WHERE ( "+
-                    "PROTOCOL_NAME = '"+self.protocol+"' ) AND ( "+
-                    "MEASUREMENT_TYPE = '"+type+"') "+
-                    "ORDER BY VALIDATION_ORDER ASC ")
+            where_val_clauses = [
+                f"protocol_name = '{self.protocol}'",
+                f"measurement_type = '{type}'",
+            ]
+            # check if the active column is in the database
+            # updated for NWC and SWC to allow for an active column in validations
+            try:
+                self.db.dbQuery(f"SELECT active FROM {self.schema}.VALIDATIONS WHERE 1=0")
+                where_val_clauses.append("active = 1")
+            except:
+                pass
+            final_val_where = " AND ".join(where_val_clauses)
+
+            sql1 = f"""
+                     SELECT 
+                        validation
+                     FROM {self.schema}.VALIDATIONS m
+                     WHERE {final_val_where}
+                     ORDER BY validation_order ASC"""
             query1 = self.db.dbQuery(sql1)
+
             vals = []
             valNames = []
 
             #  create an instance of the validation object and add to our list of validations
             for validations,  in query1:
-                valModule = ('validations.'+validations)
+                valModule = ('validations.' + validations)
                 valObj = importlib.import_module(valModule)
                 valObj = getattr(valObj, validations)
                 valNames.append(validations)
@@ -1425,7 +1566,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             #  change was implemented years after CLAMS was initially written and it is
             #  too late at this point to change everything.
             #  Enable lengthType combo box if there is 'length' type- otherwise it will be disabled
-            if (type == 'length'):
+            if type in self.length_types:
                 #  store the index of "length" in the SQL string so we can swap it out
                 #  when the user changes the length_type
                 self.sqlLengthIndex = nMeasurements
@@ -1459,12 +1600,33 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.samplingMethodBox.setCurrentIndex(self.samplingMethodBox.findText('random'))
 
         # get conditionals
-        sql = ("SELECT CONDITIONALS.CONDITIONAL FROM " + self.schema + ".CONDITIONALS WHERE ( "+
-                "CONDITIONALS.PROTOCOL_NAME = '"+self.protocol+"')")
-        query = self.db.dbQuery(sql)
+        where_con_clauses = [
+            f"protocol_name = '{self.protocol}'",
+        ]
+        # check if the active column is in the database
+        # updated for NWC and SWC to allow for an active column in validations
+        try:
+            self.db.dbQuery(f"SELECT active FROM {self.schema}.CONDITIONALS WHERE 1=0")
+            where_con_clauses.append("active = 1")
+        except:
+            pass
+        final_val_where = " AND ".join(where_con_clauses)
+
+        sql2 = f"""
+                 SELECT 
+                    conditional
+                 FROM {self.schema}.CONDITIONALS m
+                 WHERE {final_val_where}"""
+        try:
+            self.db.dbQuery(f"SELECT conditional_order FROM {self.schema}.conditionals WHERE 1=0")
+            sql2 += " ORDER BY conditional_order ASC"
+        except:
+            pass
+        query2 = self.db.dbQuery(sql2)
+
         self.conditionals = []
 
-        for conditional, in query:
+        for conditional, in query2:
             upcond = conditional
             condModule = ('conditionals.'+conditional.lower())
             condObj = importlib.import_module(condModule)
@@ -1637,8 +1799,11 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
                 #  since we failed finding this measurement, this should be one of
                 #  the specific length measurements for this species+subcode
-                if (type in self.lengthTypes):
+                if type in self.lengthTypes:
                     ind = self.measureType.index('length')
+                # added for nwfsc 6/4/26 - some dialogs return multiple values so catch that here
+                elif type in ['stomach_collect', 'gonad_collect']:
+                    continue
                 else:
                     #  huh. This shouldn't happen....
                     self.message.setMessage(self.errorIcons[1], self.errorSounds[1],
@@ -1729,7 +1894,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         '''
 
         #  make sure that a specimen has been selected
-        if (self.specimenKey == None):
+        if self.specimenKey is None:
             self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Please Select a "+
                     "specimen to print a label for.")
             self.message.exec()
@@ -1738,7 +1903,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         #  check that all required measurements have been obtained
         for i in self.iterator:
             btn = self.buttons[i]
-            if (self.values[i] == None) and (self.forcing[i] == '1') and (btn.isEnabled()):
+            if (self.values[i] is None) and (self.forcing[i] == '1') and (btn.isEnabled()):
                 #  a measurement is missing - ask the user what they want to do
                 self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "You still need a " +
                                         self.measureType[i] + " measurement. Does this bother you, " +
@@ -1755,18 +1920,25 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             code = str(self.survey) + str(self.ship) + str(self.activeHaul).zfill(3) + str(self.specimenKey)
 
             lengthType = str(self.lengthTypeBox.currentText())
-            lw_sql = ("SELECT " + lengthType + ", organism_weight FROM " + self.schema
-                      + ".v_specimen_measurements WHERE survey=" + self.survey + " AND ship = " + self.ship
-                      + " AND event_id=" + self.activeHaul + " AND specimen_id = " + self.specimenKey)
+            if 'nwfsc' in self.settings['OrganizationName'].lower():
+                lw_sql = (f"SELECT {lengthType}, organism_weight FROM {self.schema}.v_specimen_measurements "
+                          f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.activeHaul} "
+                          f"AND specimen_id={self.specimenKey}")
+
+            else:
+                lw_sql = (f"SELECT {lengthType}, weight_g FROM {self.schema}.v_specimen_measurements "
+                          f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.activeHaul} "
+                          f"AND specimen_id={self.specimenKey}")
             lw_query = self.db.dbQuery(lw_sql)
             length, weight = lw_query.first()
             self.printer.print_label(self.protocol, self.activeSpcName, self.activeSpcCode, self.activeHaul,
-                                     code, self.specimenKey, length, weight)
+                                     code, self.specimenKey, length, weight, self.settings['OrganizationName'])
         else:
             #  get data from db - query everything *BUT* length
             sql = ("SELECT ship, survey, event_id, specimen_id, species_code, common_name, "+
-                    "organism_weight, sex, maturity, scientist, barcode FROM " + self.schema + ".v_specimen_measurements WHERE "+
-                    "survey=" + self.survey +" AND ship="+self.ship+" AND specimen_id="+self.specimenKey)
+                    "organism_weight, sex, maturity, scientist, barcode FROM " + self.schema +
+                   ".v_specimen_measurements WHERE survey = " + self.survey + " AND ship = " + self.ship +
+                   " AND specimen_id = " + self.specimenKey)
             query = self.db.dbQuery(sql)
             data = query.first()
             vessel = data[0]
@@ -1786,7 +1958,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             #  to query all of the length measurements regardless of their name. First we build
             #  a list of all length types.
             len_list = []
-            sql = ("SELECT measurement_type FROM measurement_types WHERE " +
+            sql = ("SELECT measurement_type FROM " + self.schema + ".measurement_types WHERE " +
                     "is_length=1")
             query = self.db.dbQuery(sql)
             for type, in query:

@@ -55,6 +55,7 @@ import messagedlg
 import ZebraLabelPrinter
 import addspecdlg
 import FEATZebraPrinter
+import speciesEditDlg
 import measurementDialogs.FEATProjectDlg as project
 
 
@@ -105,6 +106,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.wholeHaulKey = None
         self.headerFont = QFont("Arial Black", 11, -1, False)
         self.activeSampleType = None
+        self.currSelection = ''
 
         #  set the basket precision - basket weights will be rounded to this many
         #  digits after the decimal. Note that currently the database supports
@@ -135,6 +137,9 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.basketTable.horizontalHeader().setStretchLastSection(True)
         self.speciesList.horizontalHeader().setStretchLastSection(True)
 
+        # Hide go to unsorted button, this is only for SWFSC
+        self.unsortedBtn.hide()
+
         #  set up the the basket table headers
         self.basketTable.clearContents()
         self.basketTable.setRowCount(0)
@@ -162,9 +167,9 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.delBtn.clicked.connect(self.goDelete)
         self.printBtn.clicked.connect(self.printLabel)
         self.editBtn.clicked.connect(self.editTable)
-        self.speciesList.itemSelectionChanged.connect(self.getActiveSpc)
         self.speciesList.itemActivated.connect(self.getSpeciesFocus)
-        self.basketTable.itemSelectionChanged.connect(self.getBasketRow)
+        self.speciesList.itemClicked.connect(self.getActiveSpc)
+        self.basketTable.itemClicked.connect(self.getBasketRow)
         self.transBtn.clicked.connect(self.transferSample)
         self.commentBtn.setDisabled(True)  # initially disabled
         self.commentBtn.clicked.connect(self.getComment)
@@ -641,6 +646,8 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.basketTable.setEnabled(True)
         self.sumTable.setEnabled(True)
         self.commentBtn.setEnabled(True)
+        self.editBtn.setText('Edit Sample')
+        self.currSelection = 'sample'
 
         # default setting for a species is no whole haul
 
@@ -1044,6 +1051,8 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         selectedRow = self.basketTable.currentRow()
         if selectedRow >= 0:
+            self.editBtn.setText('Edit Basket')
+            self.currSelection = 'basket'
             self.selRecord.append(self.basketTable.verticalHeaderItem(selectedRow).text())
             self.selRecord.append(self.basketTable.item(selectedRow,0).text())
             self.selRecord.append(self.basketTable.item(selectedRow,1).text())
@@ -1292,7 +1301,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             count=str(-transDlg.transCount)
         else:
             count='NULL'
-        sql = ("INSERT INTO baskets (ship, survey, event_id, sample_id, basket_type, count," +
+        sql = ("INSERT INTO " + self.schema + ".baskets (ship, survey, event_id, sample_id, basket_type, count," +
                 "weight, device_id) VALUES ("+ self.ship+", "+self.survey+","+self.activeHaul+
                 ","+transDlg.fromSampleKey+",'"+transDlg.fromType+"',"+count+","+
                 str(-transDlg.transWeight)+"," + transDlg.transDevice+")")
@@ -1304,7 +1313,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         else:
             count='NULL'
 
-        sql = ("INSERT INTO baskets (ship, survey, event_id, sample_id, basket_type, count," +
+        sql = ("INSERT INTO " + self.schema + ".baskets (ship, survey, event_id, sample_id, basket_type, count," +
                 "weight, device_id) VALUES ("+ self.ship+", "+self.survey+","+self.activeHaul+
                 ","+transDlg.toSampleKey+",'"+transDlg.toType+"',"+count+","+
                 str(transDlg.transWeight)+","+ transDlg.transDevice+")")
@@ -1322,6 +1331,14 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         '''
         self.freeze=True
 
+        #  present the edit dialog
+        if self.currSelection == 'basket':
+            header = ['Basket ID', 'Weight', 'Count', 'Basket Type' ]
+            self.currTable = self.basketTable
+        else:
+            header=['SampleId', 'Species', 'Type']
+            self.currTable = self.speciesList
+
         # turn off count sample type for mixes
         if self.activeSampleType and 'mix' in self.activeSampleType.lower():
             self.validList[self.basketTypes.index('Count')] = 0
@@ -1335,7 +1352,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 getCount=False)
 
         #  get the current basket selection
-        currentRow = self.basketTable.currentRow()
+        currentRow = self.currTable.currentRow()
 
         #  check if something is selected
         if currentRow < 0:
@@ -1345,34 +1362,73 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.freeze = False
             return
 
-        #  build a list with the nasket id, weight, count, and type
+        #  build a list with the basket id, weight, count, and type
         #  first get the ID
-        selRecord = [self.basketTable.verticalHeaderItem(currentRow).text()]
+        selRecord = [self.currTable.verticalHeaderItem(currentRow).text()]
 
         #  then append the weight, count, and type to our list
-        for item in self.basketTable.selectedItems():
+        for item in self.currTable.selectedItems():
             selRecord.append(item.text())
+        
+        if self.currSelection == 'basket':
+            editDlg = basketeditdlg.BasketEditDlg(header, selRecord, self)
+            editDlg.exec()
 
-        #  present the edit dialog
-        header = ['Basket ID', 'Weight', 'Count', 'Sample Type' ]
-        editDlg = basketeditdlg.BasketEditDlg(header, selRecord, self)
-        editDlg.exec()
-        if not editDlg.okFlag:
+            if editDlg and not editDlg.okFlag:
             #  user cancelled action
-            return
+                return
 
-        # update database - first check if this is a non-count basket type
-        if editDlg.count in ['-', '', 'NULL', 'null']:
-            #  this is not a count basket - set count to NULL
-            editDlg.count = 'NULL'
+            # update database - first check if this is a non-count basket type
+            if editDlg.count in ['-', '', 'NULL', 'null']:
+                #  this is not a count basket - set count to NULL
+                editDlg.count = 'NULL'
 
-        # update basket table
-        sql = ("UPDATE baskets SET basket_type='"+editDlg.basketType+"', count = "+
-                editDlg.count+", weight = "+editDlg.weight+"  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                " AND sample_id = "+self.activeSampleKey+" AND basket_id = "+
-                self.selRecord[0])
-        self.db.dbExec(sql)
+            # update basket table
+            sql = ("UPDATE " + self.schema + ".baskets SET basket_type='"+editDlg.basketType+"', count = "+
+                    editDlg.count+", weight = "+editDlg.weight+"  WHERE ship="+self.ship+
+                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+
+                    " AND sample_id = "+self.activeSampleKey+" AND basket_id = "+
+                    self.selRecord[0])
+            self.db.dbExec(sql)
+        else:
+            sampleId = int(selRecord[0])
+            sql = (f"SELECT count(*) from {self.schema}.specimen where sample_id={sampleId}")
+            query = self.db.dbQuery(sql)
+            specimenCnt, = query.first()
+
+            if int(specimenCnt) <= 0:
+                editDlg = speciesEditDlg.SpeciesEditDlg(header, selRecord, self)
+                editDlg.exec()
+
+                if editDlg and not editDlg.okFlag:
+                #  user cancelled action
+                    return
+
+                if editDlg.activeSpcCode and editDlg.activeSpeciesName:
+                    sql = ("update " + self.schema + ".samples set species_code=" +  
+                        editDlg.activeSpcCode + " where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    sql = ("update " + self.schema + ".sample_data set parameter_value='" +  
+                        editDlg.nameType + "' where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    rowIdx = self.speciesList.currentRow()
+                    self.speciesList.setItem(rowIdx, 0, QTableWidgetItem(editDlg.activeSpeciesName))
+                
+                if editDlg.type:
+                    sql = ("update " + self.schema + ".samples set sample_type='" + editDlg.type +  "' where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    rowIdx = self.speciesList.currentRow()
+                    self.speciesList.setItem(rowIdx, 2, QTableWidgetItem(editDlg.type))
+                
+                self.reloadSamplesList()
+            else:
+                self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
+                        "Sample cannot be edited since specimens associated with this " \
+                        "sample already exist",'info')
+                self.message.exec()
 
         self.freeze=False
 
@@ -1421,7 +1477,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 else:
                     if speciesCode in self.parentSamples:
                         #  user doesn't care, make note of this and move on
-                        sql = ("INSERT INTO overrides (scientist, record_id, " +
+                        sql = ("INSERT INTO " + self.schema + ".overrides (scientist, record_id, " +
                                 "table_name,description) VALUES ('" + self.scientist + "'," +
                                 self.parentSamples[speciesCode] + ",'sample', 'mix components are "+str(dev)+
                                 " % less than the mix subsample weight')")
@@ -1513,7 +1569,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         #  disconnect the selection changed signal so we don't
         #  trigger it when the list is cleared.
-        self.speciesList.itemSelectionChanged.disconnect()
+        #self.speciesList.itemSelectionChanged.disconnect()
 
         # clear out the existing entries
         self.speciesList.clearContents()
@@ -1637,7 +1693,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.picLabel.clear()
 
         #  reconnect the selection changed signal now that we're done changing the list
-        self.speciesList.itemSelectionChanged.connect(self.getActiveSpc)
+        #self.speciesList.itemSelectionChanged.connect(self.getActiveSpc)
         self.speciesList.scrollToBottom()
 
 
@@ -1647,7 +1703,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         '''
 
         #  ensure that a species is selcted
-        if (self.activeSpcName == None):
+        if self.activeSpcName is None:
             #  no species selected - show error dialog
             self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
                     "Please pick a sample to print a label for, " +
@@ -1661,7 +1717,8 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 selected_project = project.FEATProjectDlg(self)
                 if selected_project.result() == 1:
                     self.printer.print_label(selected_project.project_name, self.activeSpcName, self.activeSpcCode,
-                                             self.activeHaul, selected_project.code, self.activeSampleKey)
+                                             self.activeHaul, selected_project.code, self.activeSampleKey, None, None,
+                                             self.settings['OrganizationName'])
             else:
                 #  get species code
                 speciesCode = self.activeSpcCode=self.speciesDict[self.activeSpcName]
@@ -1724,7 +1781,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             commentText = ' '.join(newComment)
 
             #  update the comment in samples
-            sql = ("UPDATE samples SET comments='" + commentText + "' WHERE ship="+self.ship +
+            sql = ("UPDATE " + self.schema + ".samples SET comments='" + commentText + "' WHERE ship="+self.ship +
                     " AND survey=" + self.survey + " AND event_id = " + self.activeHaul +
                     " AND sample_id = "+self.activeSampleKey)
             self.db.dbExec(sql)

@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class GonadWeightLimitCollection(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -74,7 +74,9 @@ class GonadWeightLimitCollection(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -92,18 +94,18 @@ class GonadWeightLimitCollection(QObject):
         if sex is not None:
             if sex=='Male':
                 try:
-                    result[measurements.index('gonad_weight')]=False
-                    result[measurements.index('ovary_taken')]=False
-                    result[measurements.index('liver_weight')]=False
+                    result[measurements.index('gonad_weight')]=[False]
+                    result[measurements.index('ovary_taken')]=[False]
+                    result[measurements.index('liver_weight')]=[False]
                 except:
                     pass
             else: # sex is female
                 if maturity is not None:
                     if not maturity in self.stages:
                         try:
-                            result[measurements.index('gonad_weight')]=False
-                            result[measurements.index('ovary_taken')]=False
-                            result[measurements.index('liver_weight')]=False
+                            result[measurements.index('gonad_weight')]=[False]
+                            result[measurements.index('ovary_taken')]=[False]
+                            result[measurements.index('liver_weight')]=[False]
                         except:
                             pass
 
@@ -118,7 +120,9 @@ This class will need to be customized a bit for each individual validation.
 '''
 class conditionalTest(unittest.TestCase):
     db = None
-    gonadWeightLimitCol = GonadWeightLimitCollection(db)
+    schema = None
+    speciesCode = None
+    gonadWeightLimitCol = GonadWeightLimitCollection(db, schema, speciesCode)
 
     measurements = ['sex', 'maturity', 'gonad_weight', 'ovary_taken', 'liver_weight']
 
@@ -127,7 +131,7 @@ class conditionalTest(unittest.TestCase):
         values = ['Male', 'Immature']
 
         ok = self.gonadWeightLimitCol.evaluate(self.measurements, values, results)
-        self.assertEqual([1, 2, False, False, False], ok)
+        self.assertEqual([1, 2, [False], [False], [False]], ok)
 
     def testFemaleImmature(self):
         results = [1, 2, 3, 4, 5]
@@ -141,7 +145,7 @@ class conditionalTest(unittest.TestCase):
         values = ['female', 'asdf']
 
         ok = self.gonadWeightLimitCol.evaluate(self.measurements, values, results)
-        self.assertEqual([1, 2, False, False, False], ok)
+        self.assertEqual([1, 2, [False], [False], [False]], ok)
 
 if __name__ == '__main__':
     unittest.main()

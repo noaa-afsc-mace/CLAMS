@@ -137,10 +137,12 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
         self.message = messagedlg.MessageDlg(self)
         self.numpad = numpad.NumPad(self)
         self.typeDlg = typeseldialog.TypeSelDialog(self)
+        self.typeDlg.buttonSetup(self.validList, self.basketTypes)
 
         #  connect signals and slots
         self.manualBtn.clicked.connect(self.getManual)
-        self.doneBtn.clicked.connect(self.showCatch)
+        self.sortedBtn.clicked.connect(self.showCatch)
+        self.doneBtn.clicked.connect(self.closeWindow)
         self.delBtn.clicked.connect(self.goDelete)
         self.editBtn.clicked.connect(self.editTable)
         self.basketTable.itemSelectionChanged.connect(self.getBasketRow)
@@ -278,18 +280,6 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
         if 'basket_weight' not in self.deviceData[device_name]['measurements']['catch']:
             return
 
-        # check if a species is selected
-        if self.activeSpcName == None:
-            self.message.setMessage(self.errorIcons[2],self.errorSounds[2], self.firstName +
-                    ", please select a species.",'info')
-            self.message.exec()
-            return
-
-        #  check if the current sample type is "Present" and ignore input if so.
-        #  we don't allow baskets to be assigned to Present samples.
-        if self.activeSampleType in ['Present', None]:
-            return
-
         #  ensure that the value is numeric - noise on the data lines, poor connections,
         #  or bad power can result in garbled data.
         try:
@@ -349,7 +339,6 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
 
         '''
         #  display the basket type dialog
-        self.typeDlg.buttonSetup(self.validList, self.basketTypes)
         if self.typeDlg.exec():
             self.basketType = self.typeDlg.basketType
         else:
@@ -405,9 +394,11 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
         #  create some dicts to handle basket totals by sample type. We accumulate
         #  totals for the summary table below when populating the baskets table
         basketTotalWeight = {}
+        basketTotalCount = {}
         sumTableRows = {}
         for i, bType in enumerate(self.basketTypes):
             basketTotalWeight[bType] = 0
+            basketTotalCount[bType] = 0
             sumTableRows[bType] = i
 
         #  update the basket table - first, clear the contents
@@ -434,9 +425,11 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
             try:
                 basketWeight = float(basketWeight)
                 basketTotalWeight[basketType] += basketWeight
+                basketTotalCount[basketType] += 1
             except:
                 basketWeight = 0
                 basketTotalWeight[basketType] += 0
+                basketTotalCount[basketType] += 1
 
             #  add this basket to the table
             basketWeight = str(round(basketWeight, self.basketPrecision))
@@ -458,8 +451,10 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
         #  now update the basket summary table
         totalSampleWeight = 0
         for basketType in self.basketTypes:
+            count = str(basketTotalCount[basketType])
             weight = str(round(basketTotalWeight[basketType], self.basketPrecision))
             totalSampleWeight += basketTotalWeight[basketType]
+            self.sumTable.setItem(sumTableRows[basketType], 0, QTableWidgetItem(count))
             self.sumTable.setItem(sumTableRows[basketType], 1, QTableWidgetItem(weight))
 
         #  lastly, update the total sample weight in the samples table
@@ -679,7 +674,7 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
 
 
         # update basket table
-        sql = ("UPDATE baskets SET basket_type='"+editDlg.basketType+"', weight = "+
+        sql = ("UPDATE " + self.schema + ".baskets SET basket_type='"+editDlg.basketType+"', weight = "+
                 editDlg.weight+"  WHERE ship="+self.ship+
                 " AND survey="+self.survey+" AND event_id="+self.activeHaul+
                 " AND sample_id = "+self.activeSampleKey+" AND basket_id = "+
@@ -711,7 +706,7 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
             commentText = ' '.join(newComment)
 
             #  update the comment in samples
-            sql = ("UPDATE samples SET comments='" + commentText + "' WHERE ship="+self.ship +
+            sql = ("UPDATE " + self.schema + ".samples SET comments='" + commentText + "' WHERE ship="+self.ship +
                     " AND survey=" + self.survey + " AND event_id = " + self.activeHaul +
                     " AND sample_id = "+self.activeSampleKey)
             self.db.dbExec(sql)
@@ -784,8 +779,36 @@ class unsortedCatch(QDialog, ui_CPSUnsortedCatch.Ui_CPSUnsortedCatch):
  
         return [newPosition, newSize]
     
+    # Verify unsorted catch has at least 5 sorts baskets before proceeding
+    def hasSortedBaskets(self):
+        sql = ("SELECT count(*) FROM " + self.schema + ".baskets WHERE ship="+self.ship+" AND survey="+
+                self.survey+" AND event_id="+self.activeHaul + " AND basket_type='Sort'")
+        query = self.db.dbQuery(sql)
+        numSortBaskets, = query.first()
+        if (int(numSortBaskets) < 5):
+            self.message.setMessage(self.errorIcons[1], self.errorSounds[1], 
+                                    f"{self.firstName}, fewer than 5 sort baskets were found, continue anyway?",
+                                    'choice')
+            return self.message.exec()
+        else:
+            return True
+    
+    def closeWindow(self):
+        """
+        Disconnect signals when the window is closed to prevent ghost 
+        triggers from the shared sensorMonitor.
+        """
+        try:
+            self.sensorMonitor.SensorDataReceived.disconnect(self.getAuto)
+        except TypeError:
+            # Catch the error just in case the signal was already disconnected
+            pass
+        if self.hasSortedBaskets():
+            self.close()
+    
     def showCatch(self):
         #  show the catch form
-        catchWindow = sortedCatch.sortedCatch(self)
-        catchWindow.exec()
-        self.close()
+        if self.hasSortedBaskets():
+            self.closeWindow()
+            catchWindow = sortedCatch.sortedCatch(self)
+            catchWindow.exec()

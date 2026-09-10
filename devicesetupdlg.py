@@ -41,7 +41,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         
         
         # populate work station box
-        query = QtSql.QSqlQuery("SELECT hostname FROM workstation WHERE workstation_id="+self.workStation)
+        query = QtSql.QSqlQuery("SELECT hostname FROM " + self.schema + ".workstation WHERE workstation_id="+self.workStation)
         self.ws.setText(self.workStation)
         query.first()
         self.hn.setText(query.value(0).toString())
@@ -94,7 +94,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
     def getDevices(self):
 
         # get devices
-        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM DEVICE, MEASUREMENT_SETUP  "+ 
+        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM " + self.schema + ".DEVICE, MEASUREMENT_SETUP  "+ 
             "WHERE MEASUREMENT_SETUP.DEVICE_ID = DEVICE.DEVICE_ID  and "+ 
             " MEASUREMENT_SETUP.WORKSTATION_ID = "+self.workStation+"  AND MEASUREMENT_SETUP.DEVICE_INTERFACE='Serial'"+
             "GROUP BY DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME")
@@ -112,7 +112,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
             self.peLineEdits[i].show()
             self.dnLabels[i].setText(query.value(1).toString())
             parsetype='None'
-            query1=QtSql.QSqlQuery("SELECT device_parameter, parameter_value FROM device_configuration WHERE device_id= "+query.value(0).toString())
+            query1=QtSql.QSqlQuery("SELECT device_parameter, parameter_value FROM " + self.schema + ".device_configuration WHERE device_id= "+query.value(0).toString())
             while query1.next():
                 
                 if query1.value(0).toString()=='SerialPort':
@@ -156,7 +156,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         
         availableDevices=[]
         availableDeviceIds=[]
-        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM DEVICE, MEASUREMENT_SETUP  "+ 
+        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM " + self.schema + ".DEVICE, MEASUREMENT_SETUP  "+ 
             "WHERE MEASUREMENT_SETUP.DEVICE_ID = DEVICE.DEVICE_ID  and "+ 
             "  MEASUREMENT_SETUP.DEVICE_INTERFACE='Serial'"+
             "GROUP BY DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME")
@@ -182,7 +182,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         
         
         availableMeasurements=[]
-        query = QtSql.QSqlQuery("  SELECT measurement_types.measurement_type FROM measurement_types  "+ 
+        query = QtSql.QSqlQuery("  SELECT measurement_types.measurement_type FROM " + self.schema + ".measurement_types  "+ 
             "WHERE measurement_types.description = 'Serial' ORDER BY measurement_types.measurement_type")
         while query.next(): 
             availableMeasurements.append(query.value(0).toString())
@@ -190,7 +190,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         self.listDialog.label.setText('What will this device measure?')
         if not self.listDialog.exec_():
             return
-        query = QtSql.QSqlQuery("INSERT INTO measurement_setup (workstation_id,  measurement_type,  device_id,  device_interface, gui_module) VALUES("+
+        query = QtSql.QSqlQuery("INSERT INTO " + self.schema + ".measurement_setup (workstation_id,  measurement_type,  device_id,  device_interface, gui_module) VALUES("+
                                             self.workStation+", '"+self.listDialog.itemList.currentItem().text()+"', "+availableDeviceIds[ind]+", 'Serial','Specimen')")
         
         self.populateBoxes()
@@ -202,7 +202,7 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         """
         currentDevices=[]
         currentDeviceIds=[]
-        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM DEVICE, MEASUREMENT_SETUP  "+ 
+        query = QtSql.QSqlQuery("  SELECT DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME FROM " + self.schema + ".DEVICE, " + self.schema + ".MEASUREMENT_SETUP  "+ 
             "WHERE MEASUREMENT_SETUP.DEVICE_ID = DEVICE.DEVICE_ID  and MEASUREMENT_SETUP.WORKSTATION_ID = "+self.workStation+" AND "+ 
             "  MEASUREMENT_SETUP.DEVICE_INTERFACE='Serial'"+
             "GROUP BY DEVICE.DEVICE_ID, DEVICE.DEVICE_NAME")
@@ -219,26 +219,26 @@ class DeviceSetupDlg(QDialog, ui_DeviceSetupDlg.Ui_deviceSetupDlg):
         if reply==QMessageBox.No:
             return
         
-        query = QtSql.QSqlQuery("DELETE FROM measurement_setup WHERE measurement_setup.workstation_id="+self.workStation+" AND measurement_setup.device_id = "+currentDeviceIds[ind])
+        query = QtSql.QSqlQuery("DELETE FROM " + self.schema + ".measurement_setup WHERE measurement_setup.workstation_id="+self.workStation+" AND measurement_setup.device_id = "+currentDeviceIds[ind])
         self.populateBoxes()
         self.getDevices()
     
     def writeData(self):
             for i in range(7):
                 if not self.spBoxes[i].isHidden():
-                    query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.spBoxes[i].currentText()+
+                    query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.spBoxes[i].currentText()+
                     "' WHERE device_parameter = 'SerialPort' AND device_id="+self.devices[i]+")")
-                    query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.brBoxes[i].currentText()+
+                    query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.brBoxes[i].currentText()+
                     "' WHERE device_parameter = 'BaudRate' AND device_id="+self.devices[i]+")")
-                    query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.sfBoxes[i].currentText()+
+                    query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.sfBoxes[i].currentText()+
                     "' WHERE device_parameter = 'SoundFile' AND device_id="+self.devices[i]+")")
-                    query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.ptBoxes[i].currentText()+
+                    query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.ptBoxes[i].currentText()+
                     "' WHERE device_parameter = 'ParseType' AND device_id="+self.devices[i]+")")
                     if not self.piLineEdits[i].isEnabled():
-                        query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.piLineEdits[i].currentText()+
+                        query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.piLineEdits[i].currentText()+
                         "' WHERE device_parameter = 'ParseIndex' AND device_id="+self.devices[i]+")")
                     if not self.peLineEdits[i].isEnabled():
-                        query = QtSql.QSqlQuery("UPDATE device_configuration SET parameter_value='"+self.peLineEdits[i].currentText()+
+                        query = QtSql.QSqlQuery("UPDATE " + self.schema + ".device_configuration SET parameter_value='"+self.peLineEdits[i].currentText()+
                         "' WHERE device_parameter = 'ParseExpression' AND device_id="+self.devices[i]+")")
                         
     

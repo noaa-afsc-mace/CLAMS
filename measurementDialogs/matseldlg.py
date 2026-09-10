@@ -66,6 +66,11 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
         # used for NWFSC
         self.oto_present = True
 
+        # get the current sex value from the parent if available
+        self.sex = None
+        if hasattr(parent, 'measureType') and hasattr(parent, 'values') and 'sex' in parent.measureType:
+            self.sex = parent.values[parent.measureType.index('sex')]
+
         # get maturity stage names
         mat_stage_sql = "SELECT parameter_value FROM " + self.schema + ".species_data " \
                         "WHERE lower(species_parameter)='maturity_table' AND species_code=" + self.activeSpcCode
@@ -74,22 +79,29 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
         if not mat_stage_query:
             return
 
-        mat_desc_sql = "SELECT md.button_text, md.description_text_female " \
+        mat_desc_sql = "SELECT md.button_text, md.description_text_male " \
                        "FROM  " + self.schema + ".maturity_description md JOIN  " + self.schema + ".maturity_tables mt " \
                        "ON (mt.maturity_table = md.maturity_table) WHERE " \
-                       "(mt.maturity_table = " + mat_stage_query + ")"
+                       "(mt.maturity_table = " + mat_stage_query + ") ORDER BY md.maturity_key"
         query = self.db.dbQuery(mat_desc_sql)
         maturityBtnText = []
+        maleApplicable = []
 
-        for button_text, description in query:
+        for button_text, description_text_male in query:
             maturityBtnText.append(button_text)
+            maleApplicable.append(bool(description_text_male))
 
         # signal/slot connections
         self.guideBtn.clicked.connect(self.getGuide)
-        for btn in self.buttons:
+        for idx, btn in enumerate(self.buttons):
             btn.clicked.connect(self.getMat)
             try:
-                btn.setText(maturityBtnText[self.buttons.index(btn)])
+                btn.setText(maturityBtnText[idx])
+                # disable maturity stages that have no male description when sex is male
+                if (self.sex is not None and self.sex.lower() == 'male' and
+                        not maleApplicable[idx]):
+                    btn.setText(' - ')
+                    btn.setEnabled(False)
             except:
                 btn.setText(' - ')
                 btn.setEnabled(False)
@@ -113,4 +125,3 @@ class MatSelDlg(QDialog, ui_MatSelDlg.Ui_matselDlg):
 
         self.result = (False, '')
         self.reject()
-

@@ -189,7 +189,7 @@ class SWFSCFinClipDNADlg(QDialog, ui_SWFSCFinClipDNADlg.Ui_SWFSCFinClipDNADlg):
         checkUniqueVialNumber checks if the provided vial number exists in the
         current ship+survey. Returns True if so, False if not.
         '''
-        sql = ("SELECT measurement_value FROM measurements WHERE ship=" + self.ship +
+        sql = ("SELECT measurement_value FROM " + self.schema + ".measurements WHERE ship=" + self.ship +
                 " AND survey=" + self.survey + " AND measurement_type='dna_finclip_number' " +
                 "AND measurement_value='" + vialNum + "'")
         query = self.db.dbQuery(sql)

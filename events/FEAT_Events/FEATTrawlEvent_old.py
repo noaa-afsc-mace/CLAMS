@@ -266,7 +266,7 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
         # pull event number out of list item
         temp_event = self.lw_events.currentItem().text().split("\t")[0]
         # check again to make sure there are no samples for the event number
-        query = self.db.dbQuery("SELECT * FROM Samples WHERE event_id = " + str(temp_event))
+        query = self.db.dbQuery("SELECT * FROM " + self.schema + ".Samples WHERE event_id = " + str(temp_event))
         if query.first():
             # if there are samples, send up msg
             self.message.setMessage(self.errorIcons[1], self.errorSounds[1],
@@ -281,7 +281,7 @@ class FEATTrawlEvent(QDialog, ui_FEATTrawlEvent.Ui_Dialog):
                 return
             value = self.numpad.value
             # check that number isn't in the database
-            query_2 = self.db.dbQuery("SELECT * FROM Events WHERE event_id = " + str(value))
+            query_2 = self.db.dbQuery("SELECT * FROM " + self.schema + ".Events WHERE event_id = " + str(value))
             if query_2.first():
                 # if there is an event, send up msg
                 self.message.setMessage(self.errorIcons[1], self.errorSounds[1], "That event is already in the "

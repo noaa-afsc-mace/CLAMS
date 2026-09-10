@@ -39,7 +39,7 @@
 from PyQt6.QtCore import *
 class BodyCount50(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -70,7 +70,9 @@ class BodyCount50(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -89,7 +91,7 @@ class BodyCount50(QObject):
 
         if self.cnt > 50:
             try:
-                result[measurements.index('whole_fish')] = False
+                result[measurements.index('whole_fish')] = [False]
             except:
                 pass
 
@@ -139,10 +141,12 @@ class conditionalTest(QObject):
             #  if we've connected to the database, create and run the validation
             if ok:
                 db = conenctionDialog.db
+                schema = None
+                speciesCode = None
 
                 #  create the validation using the db connection and specified species
                 #  and subcategory.
-                self.evaluate = BodyCount50(db)
+                self.evaluate = BodyCount50(db, schema, speciesCode)
 
                 #  execute the validation 55 times
                 for x in range(55):

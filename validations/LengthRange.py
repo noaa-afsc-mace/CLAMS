@@ -61,8 +61,8 @@ class LengthRange(QObject):
         QObject.__init__(self, None)
 
         #  Get the minimum length for this species from the species_data table
-        sql = ("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code=" + speciesCode +
-               " AND subcategory='" + subcategory + "' AND lower(species_parameter)='min_length'")
+        sql = (f"SELECT parameter_value FROM {schema}.species_data WHERE species_code={speciesCode} "
+               f"AND subcategory='{subcategory}' AND lower(species_parameter)='min_length'")
         query = db.dbQuery(sql)
         minLength, = query.first()
         if minLength:
@@ -74,8 +74,8 @@ class LengthRange(QObject):
             self.minLength = 0
 
         #  Get the maximum length for this species from the species_data table
-        sql = ("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+ speciesCode +
-               " AND subcategory='"+subcategory+"' AND lower(species_parameter)='max_length'")
+        sql = (f"SELECT parameter_value FROM {schema}.species_data WHERE species_code={speciesCode} "
+               f"AND subcategory='{subcategory}' AND lower(species_parameter)='max_length'")
         query = db.dbQuery(sql)
         maxLength, = query.first()
         if maxLength:

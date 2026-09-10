@@ -53,9 +53,10 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
         self.setupUi(self)
 
         self.db = db
+        self.schema = parent.schema
 
         #  get the list of ships from the database
-        sql = ("SELECT ship, name FROM ships")
+        sql = ("SELECT ship, name FROM " + self.schema + ".ships")
         query = self.db.dbQuery(sql)
         self.vesselData = [[],[]]
         for ship, name in query:
@@ -86,7 +87,7 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
         self.shipNumber = self.vesselData[0][shipIndex]
 
         #  get the list of surveys and their ships in descending order
-        sql = ("SELECT survey FROM surveys WHERE ship=" + self.shipNumber +
+        sql = ("SELECT survey FROM " + self.schema + ".surveys WHERE ship=" + self.shipNumber +
                 " ORDER BY start_date DESC")
         query = self.db.dbQuery(sql)
         self.surveyData = []
@@ -111,7 +112,7 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
             return
 
         #  make sure that all stations are closed
-        sql = ("SELECT hostname FROM workstations WHERE lower(status)='open' and active=1")
+        sql = ("SELECT hostname FROM " + self.schema + ".workstations WHERE lower(status)='open' and active=1")
         query = self.db.dbQuery(sql)
         openHosts, = query.first()
 
@@ -128,17 +129,17 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
 
             try:
                 #  update the ActiveSurvey setting
-                sql = ("UPDATE application_configuration SET PARAMETER_VALUE = '" +
+                sql = ("UPDATE " + self.schema + ".application_configuration SET PARAMETER_VALUE = '" +
                         self.surveyData[selectedIndex] + "' WHERE PARAMETER='ActiveSurvey'")
                 self.db.dbExec(sql)
 
                 #  update the ActiveShip setting
-                sql = ("UPDATE application_configuration SET PARAMETER_VALUE = " +
+                sql = ("UPDATE " + self.schema + ".application_configuration SET PARAMETER_VALUE = " +
                         self.shipNumber + " WHERE PARAMETER='ActiveShip'")
                 self.db.dbExec(sql)
 
                 #  zero out the active haul
-                sql = ("UPDATE application_configuration SET PARAMETER_VALUE ='0' " +
+                sql = ("UPDATE " + self.schema + ".application_configuration SET PARAMETER_VALUE ='0' " +
                               " WHERE PARAMETER='ActiveEvent'")
                 self.db.dbExec(sql)
 

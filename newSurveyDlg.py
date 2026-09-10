@@ -60,37 +60,38 @@ class newSurveyDlg(QDialog, ui_NewSurveyDlg.Ui_newSurveyDlg):
         self.cancelBtn.clicked.connect(self.cancelClicked)
 
         self.db=db
+        self.schema = parent.schema
         self.shipNumbers = []
 
         #  populate the combo boxes
 
         #  get the list of ships from the database
-        sql = ("SELECT ship, name FROM ships WHERE active=1")
+        sql = ("SELECT ship, name FROM " + self.schema + ".ships WHERE active=1")
         query = self.db.dbQuery(sql)
         for ship, name in query:
             self.shipNumbers.append(ship)
             self.cbShip.addItem(name)
 
         #  get the list of personnel from the database
-        sql = ("SELECT scientist FROM personnel")
+        sql = ("SELECT scientist FROM " + self.schema + ".personnel")
         query = self.db.dbQuery(sql)
         for sciFi, in query:
             self.cbChiefSci.addItem(sciFi)
 
         #  get the list of sea areas from the database
-        sql = ("SELECT iho_sea_area FROM survey_sea_areas")
+        sql = ("SELECT iho_sea_area FROM " + self.schema + ".survey_sea_areas")
         query = self.db.dbQuery(sql)
         for iho_sea_area, in query:
             self.cbSeaArea.addItem(iho_sea_area)
 
         #  get the list of regions from the database
-        sql = ("SELECT region FROM survey_regions")
+        sql = ("SELECT region FROM " + self.schema + ".survey_regions")
         query = self.db.dbQuery(sql)
         for region, in query:
             self.cbRegion.addItem(region)
 
         #  get the list of regions from the database
-        sql = ("SELECT port FROM survey_ports WHERE active=1")
+        sql = ("SELECT port FROM " + self.schema + ".survey_ports WHERE active=1")
         query = self.db.dbQuery(sql)
         for port, in query:
             self.cbStartPort.addItem(port)
@@ -116,7 +117,7 @@ class newSurveyDlg(QDialog, ui_NewSurveyDlg.Ui_newSurveyDlg):
         endDate = QDate(self.endDateEdit.date())
 
         # check that survey doesn't exist
-        sql = ("SELECT survey FROM surveys WHERE ship=" + ship+ " AND survey=" +
+        sql = ("SELECT survey FROM " + self.schema + ".surveys WHERE ship=" + ship+ " AND survey=" +
                 surveyNumber)
         query = self.db.dbQuery(sql)
         survey, = query.first()
@@ -127,7 +128,7 @@ class newSurveyDlg(QDialog, ui_NewSurveyDlg.Ui_newSurveyDlg):
 
         #  insert the new survey
         try:
-            sql = ("INSERT INTO surveys (survey,ship,name,chief_scientist,start_date,end_date," +
+            sql = ("INSERT INTO " + self.schema + ".surveys (survey,ship,name,chief_scientist,start_date,end_date," +
                     "start_port,end_port,sea_area,abstract,region) VALUES ("+ surveyNumber + "," +
                     ship + ",'" + surveyName + "','" + self.cbChiefSci.currentText() + "',TO_DATE('" +
                     startDate.toString('MM/dd/yyyy')+"','MM/DD/YYYY')," + "TO_DATE('" +

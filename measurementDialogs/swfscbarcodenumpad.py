@@ -18,9 +18,9 @@
 
     :synopsis: Dialog to enter an alphanumeric vial number following
                the SWFSC barcode requirements. The SWFSC uses barcodes
-               that start with "A" or "G" and then have 11 numeric
+               that start with "A", "G", or "U" and then have 11 numeric
                digits. this dialog presents a modified numpad with
-               "A" and "G" keys to allow efficient manual entry of
+               "A", "G", and "U" keys to allow efficient manual entry of
                these barcodes.
 
 
@@ -106,6 +106,8 @@ class SWFSCBarcodeNumpad(QDialog, ui_SWFSCBCNumPad.Ui_SWFSCBCNumPad):
         self.pBtnA.installEventFilter(enterEater)
         self.pBtnG.clicked.connect(self.getDigit)
         self.pBtnG.installEventFilter(enterEater)
+        self.pBtnU.clicked.connect(self.getDigit)
+        self.pBtnU.installEventFilter(enterEater)
         self.pBtnBsp.clicked.connect(self.bkSpace)
         self.pBtnBsp.installEventFilter(enterEater)
         self.pBtnClr.clicked.connect(self.Clear)
@@ -151,10 +153,11 @@ class SWFSCBarcodeNumpad(QDialog, ui_SWFSCBCNumPad.Ui_SWFSCBCNumPad):
         #  TO VALIDATE SERIAL/NETWORK INPUT TOO
         #
         #
-        if len(self.dispEdit.toPlainText()) == 12 and re.search(r'^.\d+$', self.dispEdit.toPlainText()):
+        if re.search(r'^.\d+$', self.dispEdit.toPlainText()):
+        #if len(self.dispEdit.toPlainText()) == 12 and re.search(r'^.\d+$', self.dispEdit.toPlainText()):
             self.done(1)
         else:
-            self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "Alpha Barcode must start with A or G, followed only by numbers, and must be 12 characters long", 'info')
+            self.message.setMessage(self.errorIcons[2],self.errorSounds[2], "Alpha Barcode must start with A, G, or U followed only by numbers, and must be 12 characters long", 'info')
             self.message.exec()
             return
 

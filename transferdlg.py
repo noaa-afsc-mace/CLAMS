@@ -55,6 +55,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
         self.ship=parent.ship
         self.activePartition=parent.activePartition
         self.db=parent.db
+        self.schema = parent.schema
         self.basketTypes=parent.basketTypes
         self.sensorMonitor=parent.sensorMonitor
         self.devices=parent.devices
@@ -74,7 +75,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
         # populate lists
         self.sampleIds={}
         sql = ("SELECT samples.sample_id, species.common_name, samples.parent_sample," +
-                "samples.subcategory FROM samples, species WHERE " +
+                "samples.subcategory FROM " + self.schema + ".samples, " + self.schema + ".species WHERE " +
                 "samples.species_code=species.species_code AND samples.ship=" +
                 self.ship + " AND samples.survey=" + self.survey + " AND samples.event_id=" +
                 self.activeHaul + " AND samples.partition='" + self.activePartition +
@@ -134,7 +135,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
             self.fromBasketType.setEnabled(True)
             self.fromBasketType.clear()
 
-            sql = ("SELECT baskets.basket_type FROM baskets WHERE baskets.ship = " +
+            sql = ("SELECT baskets.basket_type FROM " + self.schema + ".baskets WHERE baskets.ship = " +
                     self.ship + " AND baskets.survey=" + self.survey +
                     " AND baskets.event_id=" + self.activeHaul + " AND baskets.sample_id=" +
                     self.fromSampleKey+" GROUP BY baskets.basket_type")
@@ -149,7 +150,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
             self.toBasketType.setEnabled(True)
             self.toBasketType.clear()
 
-            sql = ("SELECT gear_options.basket_type FROM gear_options INNER JOIN " +
+            sql = ("SELECT gear_options.basket_type FROM " + self.schema + ".gear_options INNER JOIN " +
                     "events ON gear_options.gear=events.gear WHERE events.ship=" +
                     self.ship+" AND events.survey="+self.survey+" AND events.event_id="+
                     self.activeHaul+" AND gear_options.basket_type "+
@@ -180,7 +181,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
                 return
 
             # check weight
-            sql = ("SELECT sum(baskets.weight) FROM baskets WHERE baskets.ship = "+
+            sql = ("SELECT sum(baskets.weight) FROM " + self.schema + ".baskets WHERE baskets.ship = "+
                     self.ship+" AND baskets.survey="+ self.survey+" AND baskets.event_id="+
                     self.activeHaul+" AND baskets.sample_id = "+self.fromSampleKey+
                     " AND baskets.basket_type ='"+self.fromType+"'")
@@ -196,7 +197,7 @@ class TransferDlg(QDialog, ui_TransferDlg.Ui_transferDlg):
                 #  only verify count if source and destination are both count sample types
                 #  (subsample will not have a count at this time so you can't verify)
                 if self.fromType== 'Count':
-                    sql = ("SELECT sum(baskets.count) FROM baskets WHERE baskets.ship = "+
+                    sql = ("SELECT sum(baskets.count) FROM " + self.schema + ".baskets WHERE baskets.ship = "+
                         self.ship+" AND baskets.survey="+self.survey+ " AND baskets.event_id="+
                         self.activeHaul+" AND baskets.sample_id = "+self.fromSampleKey+
                         " AND baskets.basket_type ='Count'")

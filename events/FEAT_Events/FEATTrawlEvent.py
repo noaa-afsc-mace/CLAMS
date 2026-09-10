@@ -397,7 +397,8 @@ class Event(QDialog, ui_FEATTrawlEvent.Ui_FEATTrawlEvent):
         td_elapsed = 0
 
         # get event types entered by timestamp
-        ev_sql = ("SELECT event_parameter, " + self.db.formatTimeStamp("parameter_value") + " AS times "
+        ev_sql = ("SELECT event_parameter, to_char(to_timestamp(parameter_value, 'MMDDYYYY HH24:MI:SS.FF3'), "
+                  "'YYYY-MM-DD H24:MI:SS.FF3') AS times "
                   "FROM " + self.schema + ".event_data WHERE ship=" + self.ship + " AND survey=" + self.survey +
                   " AND event_id=" + self.activeEvent + " AND partition='MainTrawl' AND event_parameter IN "
                                                         "('NIW', 'SD', 'TD', 'HB', 'DU', 'NOD', 'COM01', 'COM02', "

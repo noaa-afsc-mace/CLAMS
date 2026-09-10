@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class TakingOvaryRockfish(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -71,7 +71,9 @@ class TakingOvaryRockfish(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -89,8 +91,8 @@ class TakingOvaryRockfish(QObject):
             sex=str(values[measurements.index('sex')])
             if (sex.lower() == 'male'):
                 try:
-                    result[measurements.index('ovary_taken')]=False
-                    result[measurements.index('barcode')]=False
+                    result[measurements.index('ovary_taken')]=[False]
+                    result[measurements.index('barcode')]=[False]
                 except:
                     pass
 
@@ -105,7 +107,9 @@ This class will need to be customized a bit for each individual validation.
 '''
 class conditionalTest(unittest.TestCase):
     db = None
-    takingOvaryRockfish = TakingOvaryRockfish(db)
+    schema = None
+    speciesCode = None
+    takingOvaryRockfish = TakingOvaryRockfish(db, schema, speciesCode)
 
     measurements = ['sex', 'ovary_taken', 'barcode']
 
@@ -114,7 +118,7 @@ class conditionalTest(unittest.TestCase):
         results = [1, 2, 3]
 
         ok = self.takingOvaryRockfish.evaluate(self.measurements, values, results)
-        self.assertEqual([1, False, False], ok)
+        self.assertEqual([1, [False], [False]], ok)
 
     def testFemale(self):
         values = ['female']

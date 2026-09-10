@@ -56,7 +56,8 @@ class LengthWeight(QObject):
             the init method (see LengthRange.py for example.)
 
         '''
-
+        self.schema = schema
+        self.db = db
         #  call the superclass init
         QObject.__init__(self, None)
 
@@ -64,9 +65,9 @@ class LengthWeight(QObject):
         #  the species_data table
 
         #  Get the valid length weight parameters for this species from the species table
-        sql=("SELECT parameter_value FROM" + schema + ".species_data WHERE species_code="+speciesCode+
-             " AND subcategory='"+subcategory+"' AND lower(species_parameter)='a_param'")
-        query = db.dbQuery(sql)
+        sql=(f"SELECT parameter_value FROM {schema}.species_data WHERE species_code={speciesCode} "
+             f"AND subcategory='{subcategory}' AND lower(species_parameter)='a_param'")
+        query = self.db.dbQuery(sql)
         aParam, = query.first()
         if aParam:
             #  don't convert to float here, we'll do that in the validate method so
@@ -75,9 +76,9 @@ class LengthWeight(QObject):
         else:
             self.aParm = None
 
-        sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+speciesCode+
-             " AND subcategory='"+subcategory+"' AND lower(species_parameter)='b_param'")
-        query = db.dbQuery(sql)
+        sql=(f"SELECT parameter_value FROM {self.schema}.species_data WHERE species_code={speciesCode} "
+             f"AND subcategory='{subcategory}' AND lower(species_parameter)='b_param'")
+        query = self.db.dbQuery(sql)
         bParam, = query.first()
         if bParam:
             #  don't convert to float here, we'll do that in the validate method so
@@ -87,8 +88,8 @@ class LengthWeight(QObject):
             self.bParm = None
 
         # get the allowable deviation tolerance
-        sql = "SELECT parameter_value FROM " + schema + ".application_configuration WHERE lower(parameter)='lw_tolerance'"
-        query = db.dbQuery(sql)
+        sql = f"SELECT parameter_value FROM {self.schema}.application_configuration WHERE lower(parameter)='lw_tolerance'"
+        query = self.db.dbQuery(sql)
         lwTolerance, = query.first()
         if lwTolerance:
             self.tolerance = lwTolerance
@@ -164,12 +165,23 @@ class LengthWeight(QObject):
         #        and I don't know if a generic 'length' is currently used or the specific length type
         #        is passed in the measurements dict. If the specific type is passed, this code needs
         #        to be updated to match
+        len_list = []
+        sql = f"SELECT measurement_type FROM {self.schema}.measurement_types WHERE is_length=1"
+        query = self.db.dbQuery(sql)
+        for l_type, in query:
+            len_list.append(l_type)
 
         #  get the measured length
-        length = float(values[measurements.index('length')])
-        if length == None:
-            result = (False, "There's no length recorded yet! LengthWeight validation cannot run.")
-            return result
+        len_col_name = next((m for m in measurements if m in len_list), None)
+        if len_col_name is None:
+            return False, "There's no length recorded yet! LengthWeight validation cannot run."
+        len_idx = measurements.index(len_col_name)
+        raw_len = values[len_idx]
+
+        if raw_len is None or raw_len == "":
+            return False, "There's no length recorded! LengthWeight validation cannot run."
+
+        length = float(raw_len)
 
         #  calculate the theoretical weight based on the length and LW regression
         calcWt = (length ** aParam) * bParam

@@ -47,10 +47,10 @@ class MetadataFields(Enum):
     Collection = 'Collection'
     Operator = 'Operator'
     State = 'State'
-    Country = 'Country'
+    #Country = 'Country'
     Gear = 'Gear'
     FishingMode = 'FishingMode'
-    ArcedTow = 'ArcedTow'
+    #ArcedTow = 'ArcedTow'
     SeaCondition = 'SeaCondition'
     Clouds = 'Clouds'
     DownswellTow = 'DownswellTow'
@@ -65,6 +65,10 @@ class MetaDlg(QDialog, ui_CPSMetaDlg.Ui_metaDlg):
     def __init__(self, parent=None):
         super(MetaDlg, self).__init__(parent)
         self.setupUi(self)
+        self.cb_country.hide()
+        self.l_country.hide() 
+        self.cb_arced_tow.hide()
+        self.l_arced_tow.hide()
         self.settings = parent.settings
         self.db = parent.db
         self.activeEvent = parent.activeEvent
@@ -90,10 +94,10 @@ class MetaDlg(QDialog, ui_CPSMetaDlg.Ui_metaDlg):
         self.pbs = {MetadataFields.Collection.value: [self.pb_collection, 'ed', 'np']}
         self.cbs = {MetadataFields.Operator.value: [self.cb_operator, 'ed'],
                     MetadataFields.State.value: [self.cb_state, 'ed'],
-                    MetadataFields.Country.value: [self.cb_country, 'ed'],
+                    #MetadataFields.Country.value: [self.cb_country, 'ed'],
                     MetadataFields.Gear.value: [self.cb_gear, 'ed'],
                     MetadataFields.FishingMode.value: [self.cb_fishing_mode, 'ed'],
-                    MetadataFields.ArcedTow.value: [self.cb_arced_tow, 'ed'],
+                    #MetadataFields.ArcedTow.value: [self.cb_arced_tow, 'ed'],
                     MetadataFields.SeaCondition.value: [self.cb_sea_cond, 'ed'],
                     MetadataFields.Clouds.value: [self.cb_clouds, 'ed']}
         self.tf = {MetadataFields.DownswellTow.value: [self.tf_downswell_tow, 'ed'],

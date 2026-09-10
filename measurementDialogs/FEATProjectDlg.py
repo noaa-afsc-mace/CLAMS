@@ -107,14 +107,20 @@ class FEATProjectDlg(QDialog):
         if self.activeSpcCode not in ['100000', '100001', '100002', '100003', '100004', '100005']:
             if self.protos:
                 sp_protos = self.protos[self.activeSpcCode]
+                
+                # --> NEW: Create a set to track labels we have already made buttons for
+                seen_labels = set() 
+                
                 # get the label and check if there is a specimen_collection for each protocol
                 for proto in sp_protos:
-                    proto_sql = ("SELECT label FROM "
-                                 + self.schema + ".protocol_definitions WHERE protocol_name='" + proto +
-                                 "' AND measurement_type='group_collection'")
+                    proto_sql = (f"SELECT label FROM {self.schema}.protocol_definitions WHERE protocol_name='{proto}' "
+                                 f"AND measurement_type='group_collection'")
                     proto_query = self.db.dbQuery(proto_sql)
                     label, = proto_query.first()
-                    if label:
+
+                    if label and label not in seen_labels:
+                        seen_labels.add(label)
+                        
                         btn = QPushButton()
                         btn.setStyleSheet("color: rgb(0, 0, 127); font: 30pt 'Calibri';")
                         btn.setText(label)
@@ -149,15 +155,14 @@ class FEATProjectDlg(QDialog):
         self.project_label = self.sender().text()
 
         # get the protocol name
-        proto_sql = "SELECT protocol_name FROM Protocol_Definitions WHERE label = '" + self.project_label + "'"
+        proto_sql = f"SELECT protocol_name FROM {self.schema}.protocol_definitions WHERE label='{self.project_label}'"
         proto_query = self.db.dbQuery(proto_sql)
         self.project_name, = proto_query.first()
 
         # check if sample already taken
-        dup_sql = ("SELECT parameter_value FROM " + self.schema + " .sample_data WHERE ship=" + self.ship
-                   + " AND survey=" + self.survey + " AND event_id=" + self.activeHaul + " AND sample_id="
-                   + self.activeSampleKey + " AND sample_parameter='sample_collection' AND parameter_value LIKE '"
-                   + self.project_name + "%'")
+        dup_sql = (f"SELECT parameter_value FROM {self.schema}.sample_data WHERE ship={self.ship} "
+                   f"AND survey={self.survey} AND event_id={self.activeHaul} AND sample_id={self.activeSampleKey} "
+                   f"AND sample_parameter='sample_collection' AND parameter_value LIKE '{self.project_name}%'")
         dup_query = self.db.dbQuery(dup_sql)
         param_val, = dup_query.first()
         if param_val:
@@ -184,11 +189,11 @@ class FEATProjectDlg(QDialog):
                         self.collected_num = val
 
                     # update the entry
-                    update_sql = ("UPDATE " + self.schema + ".sample_data SET parameter_value='" + self.project_name + "-"
-                                  + self.collected_num + "' WHERE ship=" + self.ship + " AND survey="
-                                  + self.survey + " AND event_id=" + self.activeHaul + " AND sample_id="
-                                  + self.activeSampleKey + " AND sample_parameter='sample_collection' "
-                                                           "AND parameter_value LIKE '" + self.project_name + "%'")
+                    update_sql = (f"UPDATE {self.schema}.sample_data SET "
+                                  f"parameter_value='{self.project_name}-{self.collected_num}' "
+                                  f"WHERE ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul} "
+                                  f"AND sample_id={self.activeSampleKey} AND sample_parameter='sample_collection' "
+                                  f"AND parameter_value LIKE '{self.project_name}%'")
                     self.db.dbQuery(update_sql)
             else:
                 return
@@ -196,7 +201,7 @@ class FEATProjectDlg(QDialog):
             # there is no sample entered, so insert it
             self.numpad.msgLabel.setText("How many " + self.activeSpcName + " are you collecting?")
             if not self.numpad.exec():
-                #  user cancelled action
+                #  user canceled action
                 return
             #  get the number from the numpad
             val = self.numpad.value
@@ -210,17 +215,16 @@ class FEATProjectDlg(QDialog):
                 self.collected_num = val
 
             # enter into sample_data
-            insert_vals = "(" + self.ship + ", " + self.survey + ", " + self.activeHaul + ", " \
-                          + self.activeSampleKey + ", 'sample_collection', '" + self.project_name + "-" \
-                          + self.collected_num + "')"
-            insert_txt = ("INSERT INTO " + self.schema
-                          + ".sample_data (ship, survey, event_id, sample_id, sample_parameter, parameter_value) "
-                            "VALUES %s" % insert_vals)
+            insert_vals = (f"({self.ship}, {self.survey}, {self.activeHaul}, {self.activeSampleKey}, "
+                           f"'sample_collection', '{self.project_name}-{self.collected_num}')")
+            insert_txt = (f"INSERT INTO {self.schema}.sample_data "
+                          f"(ship, survey, event_id, sample_id, sample_parameter, parameter_value) "
+                          f"VALUES %s" % insert_vals)
 
             self.db.dbQuery(insert_txt)
 
         # create barcode
-        self.code = str(self.survey) + str(self.ship) + str(self.activeHaul) + str(self.activeSampleKey) + \
+        self.code = str(self.survey) + str(self.ship) + str(self.activeHaul.zfill(3)) + str(self.activeSampleKey) + \
                     str(self.collected_num)
 
         self.accept()

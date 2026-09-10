@@ -13,6 +13,7 @@ class MatGuide(QDialog, ui_MatGuide.Ui_matGuide):
         self.setupUi(self)
 
         self.db=parent.db
+        self.schema = parent.schema
         self.speciesName=parent.speciesName
         self.activeSpcCode = parent.activeSpcCode
         self.activeSpcSubcat = parent.activeSpcSubcat
@@ -53,7 +54,7 @@ class MatGuide(QDialog, ui_MatGuide.Ui_matGuide):
         self.spcLabel.setText(self.speciesName)
 
         #  get the maturity table for this species
-        sql = ("SELECT parameter_value FROM species_data WHERE lower(species_parameter)='maturity_table' "+
+        sql = ("SELECT parameter_value FROM " + self.schema + ".species_data WHERE lower(species_parameter)='maturity_table' "+
                 "AND species_code="+self.activeSpcCode + " AND subcategory='" + self.activeSpcSubcat + "'")
         query = self.db.dbQuery(sql)
         maturityTable, = query.first()
@@ -63,8 +64,8 @@ class MatGuide(QDialog, ui_MatGuide.Ui_matGuide):
         if self.maturityTable:
 
             #  set the description
-            sql = ("SELECT description FROM " +
-                    "maturity_tables WHERE maturity_table="+self.maturityTable)
+            sql = ("SELECT description FROM " + self.schema +
+                   ".maturity_tables WHERE maturity_table="+self.maturityTable)
             query = self.db.dbQuery(sql)
             matDescription, = query.first()
             self.matTabLabel.setText(matDescription)

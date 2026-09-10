@@ -34,7 +34,8 @@ class PrintLabel:
             print(e)
             return False
 
-    def print_label(self, project, species_name, species_code, event, code, spec_num=None, length=None, weight=None):
+    def print_label(self, project, species_name, species_code, event, code, spec_num=None, length=None,
+                    weight=None, center=None):
         """
         takes the passed information and sends to the printer
         :param project: name of the project
@@ -42,6 +43,10 @@ class PrintLabel:
         :param species_code: code of the species
         :param event: event number
         :param code: barcode zpl
+        :param spec_num: specimen number
+        :param length: length of the specimen
+        :param weight: weight of the specimen
+        :param center: org name
         :return: none
         """
         # get current date
@@ -51,10 +56,13 @@ class PrintLabel:
         bc = Code128_Barcode(code, 'N', 100, 'Y')
 
         z_doc = ZPLDocument()
-        # TOP LINE; NWFSC/FEAT Sample Haul: # SN: #
+        # TOP LINE; IWCPS Sample Haul: # SN: #
         z_doc.add_zpl_raw("^XA")
         z_doc.add_zpl_raw("^FO15,55")
-        z_doc.add_zpl_raw("^A0N,110,40^FDIWCPS Sample\tHaul: " + str(event))
+        if center:
+            z_doc.add_zpl_raw("^A0N,110,40^FDIWCPS " + center + " Sample\tHaul: " + str(event))
+        else:
+            z_doc.add_zpl_raw("^A0N,110,40^FDIWCPS Sample\tHaul: " + str(event))
         if spec_num:
             z_doc.add_zpl_raw("\t\tSN: " + str(spec_num) + "^FS")
         else:
@@ -67,7 +75,6 @@ class PrintLabel:
 
         # THIRD LINE
         if length:
-            print(length, weight)
             z_doc.add_zpl_raw("^FO15,250")
             z_doc.add_zpl_raw("^A0N,40,30^FDLength: " + str(length))
             if weight:
@@ -91,7 +98,7 @@ class PrintLabel:
         png = z_doc.render_png(label_width=5, label_height=3)
         fake_file = io.BytesIO(png)
         img = Image.open(fake_file)
-        #img.show()
+        img.show()
         """
         # print to network printer
         printer = NetworkPrinter(self.ip, self.port)
@@ -99,3 +106,4 @@ class PrintLabel:
             printer.print_zpl(z_doc)
         except (TimeoutError, PermissionError):
             print('cannot connect to printer')
+        #"""

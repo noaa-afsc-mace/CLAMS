@@ -152,7 +152,8 @@ class NetDlgFEAT(QDialog, ui_NetDlg_FEAT.Ui_netDlg):
                 sql = ("SELECT measurement_value FROM " + self.schema + ".event_stream_data WHERE ship=" +
                         self.ship + " AND survey=" + self.survey + " AND event_id=" +
                         self.activeEvent + " AND measurement_type='" + self.measurements[i] +
-                        "' AND time_stamp=" + self.db.createTimeStamp(timestamp))
+                        "' AND time_stamp= to_timestamp('" + timestamp + "', 'MMDDYYYY HH24:MI:SS.FF3')"
+                       )
                 dataQuery = self.db.dbQuery(sql)
                 val, = dataQuery.first()
                 if val:

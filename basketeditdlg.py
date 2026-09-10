@@ -168,9 +168,11 @@ class BasketEditDlg(QDialog, ui_BasketEditDlg.Ui_basketeditDlg):
             self.basketType = self.typeDlg.basketType
 
             #  check if it has changed
-            if oldType.lower() == self.basketType.lower():
-                #  same type selected, do nothing more
-                return
+            if (self.basketType):
+                if oldType.lower() == self.basketType.lower():
+                    #  same type selected, do nothing more
+                    return
+            
 
             #  if they selected the count type, display the numpad to get the count
             if self.basketType.lower() == 'count':

@@ -48,6 +48,8 @@ import ZebraLabelPrinter
 import addspecdlg
 import FEATZebraPrinter
 import measurementDialogs.FEATProjectDlg as project
+import speciesEditDlg
+import CPS.unsortedCatch as unsortedCatch
 
 
 class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
@@ -74,6 +76,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.schema = parent.schema
 
         # initialize variables
+        self.printer = None
         self.addspec_flag = True
         self.planktonFlag = False
         self.activeSampleKey = None
@@ -82,8 +85,8 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.activeFullName = None
         self.samplePicture = None
         self.comment = ''
-        self.validList = [1, 1]# sets valid sample type choices
-        self.basketTypes = ['Measure', 'Toss']
+        self.validList = [1, 1, 1]# sets valid sample type choices
+        self.basketTypes = ['Measure', 'Count', 'Toss']
         self.freeze = False
         self.whHaulFlag = False
         self.devices = {}
@@ -93,10 +96,12 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.manualDevice ='0'
         self.parentSamples = {}
         self.mixtureNames = {'100000':'WholeHaul', '100001':'SortingTable',
-                '100002':'Mix1', '100003':'SubMix1', '100004':'Mix2'}
+                '100002':'Mix1', '100003':'SubMix1', '100004':'Mix2','3':"SubMix"}
         self.wholeHaulKey = None
         self.headerFont = QFont("Arial Black", 11, -1, False)
         self.activeSampleType = None
+        self.isCurrSubMix = False
+        self.currSelection = ''
 
         #  set the basket precision - basket weights will be rounded to this many
         #  digits after the decimal. Note that currently the database supports
@@ -118,6 +123,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         # add partition to event
         haul_txt = str(self.activeHaul) + " - " + str(self.activePartition)
         self.haulNum.setText(haul_txt)
+        self.transBtn.hide()
 
         #  set up tables for data display - most of this is done in QDesigner
         #  but some properties don't seem to "stick" (maybe QDesigner is buggy?)
@@ -150,21 +156,29 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         #  connect signals and slots
         self.addspcBtn.clicked.connect(self.getSpecies)
         self.manualBtn.clicked.connect(self.getManual)
-        self.doneBtn.clicked.connect(self.close)
+        self.doneBtn.clicked.connect(self.closeWindow)
         self.delBtn.clicked.connect(self.goDelete)
         self.printBtn.clicked.connect(self.printLabel)
         self.editBtn.clicked.connect(self.editTable)
         self.speciesList.itemSelectionChanged.connect(self.getActiveSpc)
         self.speciesList.itemActivated.connect(self.getSpeciesFocus)
-        self.basketTable.itemSelectionChanged.connect(self.getBasketRow)
-        self.transBtn.clicked.connect(self.transferSample)
+        self.basketTable.itemClicked.connect(self.getBasketRow)
         self.commentBtn.setDisabled(True)  # initially disabled
         self.commentBtn.clicked.connect(self.getComment)
-        
+        self.unsortedBtn.clicked.connect(self.showUnsorted)
 
         #  connect the SensorMonitor SerialDataReceived signal to the
         #  getAuto method which processes input from devices.
         self.sensorMonitor.SensorDataReceived.connect(self.getAuto)
+
+        # Querying application_configuration table to set MaxMinDev from 
+        # sampleThreshold value for sub-sample check
+        sql = "SELECT parameter_value FROM " + self.schema + ".application_configuration " \
+              "where parameter='SubSampleCheckThreshold'"
+        query = self.db.dbQuery(sql)
+        threshold, = query.first()
+        threshold = float(threshold) if threshold else 0.0
+        self.settings['MaxMixDev'] = threshold
 
         #  restore the application state
         self.appSettings = QSettings('CLAMS', 'CatchForm')
@@ -217,6 +231,56 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                     "'PartitionWeight','TBD')")
                 self.db.dbExec(sql)
 
+            #  Check if we have a label printer attached at this workstation. If so,
+            #  create the printer object and if not, disable the print button
+            sql = ("SELECT MEASUREMENT_SETUP.DEVICE_ID, DEVICES.DEVICE_NAME " +
+                   "FROM " + self.schema + ".MEASUREMENT_SETUP INNER JOIN  " + self.schema + ".DEVICES ON " +
+                   "MEASUREMENT_SETUP.DEVICE_ID = DEVICES.DEVICE_ID WHERE " +
+                   "MEASUREMENT_SETUP.WORKSTATION_ID = " + self.workStation +
+                   " AND DEVICES.DEVICE_NAME = 'Label_Printer'" +
+                   " GROUP BY MEASUREMENT_SETUP.DEVICE_ID, DEVICES.DEVICE_NAME")
+            query = self.db.dbQuery(sql)
+            printerId, printerName = query.first()
+            if printerId:
+                #  initialize the Label Printer
+                if 'nwfsc' in self.settings['OrganizationName'].lower() or \
+                        'swfsc' in self.settings['OrganizationName'].lower():
+                    # get the ip and port
+                    printer_sql = ("SELECT device_parameter, parameter_value "
+                                   "FROM " + self.schema + ".device_configuration WHERE device_id = " + printerId)
+                    print_query = self.db.dbQuery(printer_sql)
+                    ip = None
+                    port = None
+                    for param, val in print_query:
+                        if param.lower() == 'networkaddress':
+                            ip = val
+                        elif param.lower() == 'networkport':
+                            port = val
+                    self.printer = FEATZebraPrinter.PrintLabel(self.ship, self.survey, ip, port)
+                else:
+                    self.printer = ZebraLabelPrinter.ZebraLabelPrinter(self.sensorMonitor, printerName)
+            else:
+                #  no printer configured
+                self.printer = None
+                self.printBtn.setEnabled(False)
+            #  set up the printer sound.
+            sql = ("select a.parameter_value from " + self.schema + ".device_configuration a," +
+                   self.schema + ".devices b where a.device_id=b.device_id " +
+                   "and b.device_name='Label_Printer' and a.device_parameter='SoundFile'")
+            query = self.db.dbQuery(sql)
+            soundFile, = query.first()
+            if soundFile:
+                hasExt = soundFile.split('.')
+                if len(hasExt) > 1:
+                    soundFile = self.settings['SoundsDir'] + soundFile
+                else:
+                    soundFile = self.settings['SoundsDir'] + soundFile + '.wav'
+                soundEffect = QSoundEffect()
+                soundEffect.setSource(QUrl.fromLocalFile(soundFile))
+                self.printSound = soundEffect
+            else:
+                self.printSound = None
+
         #  setup parent sample. if not present, create whole catch sample which is
         #  the top level sample (no parent)
         sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship="+self.ship+" AND survey="+
@@ -253,7 +317,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             query = self.db.dbQuery(sql)
             self.parentSamples, = query.first()
 
-        self.spcDlg = cpsAddCatchSpcDlg.cpsAddCatchSpcDlg(self)
+        self.spcDlg = cpsAddCatchSpcDlg.cpsAddCatchSpcDlg('Add', self)
         self.spcDlg.changed.connect(self.addSpecies)
         self.sortingTableKey = self.parentSamples
 
@@ -271,6 +335,24 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
 
         #self.updateParentKeys()
+    
+    def closeWindow(self):
+        """
+        Disconnect signals when the window is closed to prevent ghost 
+        triggers from the shared sensorMonitor.
+        """
+        try:
+            self.sensorMonitor.SensorDataReceived.disconnect(self.getAuto)
+        except TypeError:
+            # Catch the error just in case the signal was already disconnected
+            pass
+        self.close()
+
+
+    def showUnsorted(self):
+        self.closeWindow()
+        unsorted = unsortedCatch.unsortedCatch(self)
+        unsorted.exec()
 
 
     def getSpecies(self):
@@ -355,7 +437,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             
         # Get parentId of submix and add count to basket types
         if isSubMix:
-            sql = ("select sample_id from samples where survey=" + self.survey + 
+            sql = ("select sample_id from " + self.schema + ".samples where survey=" + self.survey +
                " AND event_id=" + self.activeHaul + 
                " AND parent_sample=" + self.parentSamples + 
                " AND sample_type='SubMix'")
@@ -480,8 +562,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.basketTable.setEnabled(enabled)
         self.sumTable.setEnabled(enabled)
         self.manualBtn.setEnabled(enabled)
-        self.transBtn.setEnabled(enabled)
-        self.editBtn.setEnabled(enabled)
+        self.editBtn.setEnabled(True)
 
 
     def checkSampleExists(self, sampID):
@@ -533,9 +614,12 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         '''getActiveSpc is called when the user selects a species from the species list.
 
         '''
+        print('get active species')
         self.basketTable.setEnabled(True)
         self.sumTable.setEnabled(True)
         self.commentBtn.setEnabled(True)
+        self.editBtn.setText('Edit Sample')
+        self.currSelection = 'sample'
 
         # default setting for a species is no whole haul
 
@@ -567,6 +651,15 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         #  get the species name
         speciesName = self.speciesList.item(self.speciesList.currentRow(), 0).text()
         parentSample = self.speciesList.item(self.speciesList.currentRow(), 1).text()
+
+        # turn off count sample type when sample is a submix
+        if parentSample == 'SubMix':
+            self.validList[self.basketTypes.index('Count')] = 1
+        else:
+            self.validList[self.basketTypes.index('Count')] = 0
+
+        #  display the basket type dialog
+        self.typeDlg.buttonSetup(self.validList, self.basketTypes)
 
         #  display the dialog for confirming active species - this was introduced
         #  after it was discovered that if you select one item, then roll your
@@ -603,10 +696,6 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.setActiveSampleType(self.activeSampleType)
 
         # look for previous data on 
-        if parentSample == 'SubMix':
-            self.basketTypes = ['Measure', 'Toss', 'Count']
-        else:
-            self.basketTypes = ['Measure', 'Toss']
         self.updateTables()
         self.focus='speciesList'
 
@@ -782,9 +871,6 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         the basket is a measure, count, or toss basket.
 
         '''
-
-        #  display the basket type dialog
-        self.typeDlg.buttonSetup(self.validList, self.basketTypes)
         if self.typeDlg.exec():
             self.basketType = self.typeDlg.basketType
             self.count = self.typeDlg.count
@@ -937,6 +1023,8 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         selectedRow = self.basketTable.currentRow()
         if selectedRow >= 0:
+            self.editBtn.setText('Edit Basket')
+            self.currSelection = 'basket'
             self.selRecord.append(self.basketTable.verticalHeaderItem(selectedRow).text())
             self.selRecord.append(self.basketTable.item(selectedRow,0).text())
             self.selRecord.append(self.basketTable.item(selectedRow,1).text())
@@ -1150,6 +1238,13 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 self.db.dbExec(sql)
                 self.activeSpcName = None
 
+                sql = ("DELETE FROM " + self.schema + ".samples WHERE ship="+self.ship+" AND survey="+
+                        self.survey+" AND event_id="+self.activeHaul+" AND sample_type='SubMix' AND 0=" +
+                        "(SELECT COUNT(*) FROM " + self.schema + ".samples WHERE parent_sample=(SELECT sample_id from "+
+                        self.schema+ ".samples WHERE ship="+self.ship+" AND survey="+self.survey+" AND "+
+                        "event_id="+self.activeHaul+" AND sample_type='SubMix'))")
+                self.db.dbExec(sql)
+
             #  refresh the species list
             self.reloadSamplesList()
 
@@ -1185,7 +1280,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             count=str(-transDlg.transCount)
         else:
             count='NULL'
-        sql = ("INSERT INTO baskets (ship, survey, event_id, sample_id, basket_type, count," +
+        sql = ("INSERT INTO " + self.schema + ".baskets (ship, survey, event_id, sample_id, basket_type, count," +
                 "weight, device_id) VALUES ("+ self.ship+", "+self.survey+","+self.activeHaul+
                 ","+transDlg.fromSampleKey+",'"+transDlg.fromType+"',"+count+","+
                 str(-transDlg.transWeight)+"," + transDlg.transDevice+")")
@@ -1197,7 +1292,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         else:
             count='NULL'
 
-        sql = ("INSERT INTO baskets (ship, survey, event_id, sample_id, basket_type, count," +
+        sql = ("INSERT INTO " + self.schema + ".baskets (ship, survey, event_id, sample_id, basket_type, count," +
                 "weight, device_id) VALUES ("+ self.ship+", "+self.survey+","+self.activeHaul+
                 ","+transDlg.toSampleKey+",'"+transDlg.toType+"',"+count+","+
                 str(transDlg.transWeight)+","+ transDlg.transDevice+")")
@@ -1215,6 +1310,14 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         '''
         self.freeze=True
 
+        #  present the edit dialog
+        if self.currSelection == 'basket':
+            header = ['Basket ID', 'Weight', 'Count', 'Basket Type' ]
+            self.currTable = self.basketTable
+        else:
+            header=['SampleId', 'Species', 'Type']
+            self.currTable = self.speciesList
+
         # turn off count sample type for mixes
         if self.activeSampleType and 'mix' in self.activeSampleType.lower():
             self.validList[self.basketTypes.index('Count')] = 0
@@ -1228,7 +1331,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 getCount=False)
 
         #  get the current basket selection
-        currentRow = self.basketTable.currentRow()
+        currentRow = self.currTable.currentRow()
 
         #  check if something is selected
         if currentRow < 0:
@@ -1240,32 +1343,72 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         #  build a list with the nasket id, weight, count, and type
         #  first get the ID
-        selRecord = [self.basketTable.verticalHeaderItem(currentRow).text()]
+        selRecord = [self.currTable.verticalHeaderItem(currentRow).text()]
 
         #  then append the weight, count, and type to our list
-        for item in self.basketTable.selectedItems():
-            selRecord.append(item.text())
+        for item in self.currTable.selectedItems():
+            selRecord.append(item.text())  
+        
+        if self.currSelection == 'basket':
+            editDlg = basketeditdlg.BasketEditDlg(header, selRecord, self)
+            editDlg.exec()
 
-        #  present the edit dialog
-        header = ['Basket ID', 'Weight', 'Count', 'Sample Type' ]
-        editDlg = basketeditdlg.BasketEditDlg(header, selRecord, self)
-        editDlg.exec()
-        if not editDlg.okFlag:
+            if editDlg and not editDlg.okFlag:
             #  user cancelled action
-            return
+                return
 
-        # update database - first check if this is a non-count basket type
-        if editDlg.count in ['-', '', 'NULL', 'null']:
-            #  this is not a count basket - set count to NULL
-            editDlg.count = 'NULL'
+            # update database - first check if this is a non-count basket type
+            if editDlg and editDlg.count in ['-', '', 'NULL', 'null']:
+                #  this is not a count basket - set count to NULL
+                editDlg.count = 'NULL'
 
-        # update basket table
-        sql = ("UPDATE baskets SET basket_type='"+editDlg.basketType+"', count = "+
-                editDlg.count+", weight = "+editDlg.weight+"  WHERE ship="+self.ship+
-                " AND survey="+self.survey+" AND event_id="+self.activeHaul+
-                " AND sample_id = "+self.activeSampleKey+" AND basket_id = "+
-                self.selRecord[0])
-        self.db.dbExec(sql)
+            # update basket table
+            sql = ("UPDATE " + self.schema + ".baskets SET basket_type='"+editDlg.basketType+"', count = "+
+                    editDlg.count+", weight = "+editDlg.weight+"  WHERE ship="+self.ship+
+                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+
+                    " AND sample_id = "+self.activeSampleKey+" AND basket_id = "+
+                    self.selRecord[0])
+            self.db.dbExec(sql)
+        else:
+            sampleId = int(selRecord[0])
+            sql = (f"SELECT count(*) from {self.schema}.specimen where sample_id={sampleId}")
+            query = self.db.dbQuery(sql)
+            specimenCnt, = query.first()
+
+            if int(specimenCnt) <= 0:
+                editDlg = speciesEditDlg.SpeciesEditDlg(header, selRecord, self)
+                editDlg.exec()
+
+                if editDlg and not editDlg.okFlag:
+                #  user cancelled action
+                    return
+
+                if editDlg.activeSpcCode and editDlg.activeSpeciesName:
+                    sql = ("update " + self.schema + ".samples set species_code=" +  
+                        editDlg.activeSpcCode + " where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    sql = ("update " + self.schema + ".sample_data set parameter_value='" +  
+                        editDlg.nameType + "' where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    rowIdx = self.speciesList.currentRow()
+                    self.speciesList.setItem(rowIdx, 0, QTableWidgetItem(editDlg.activeSpeciesName))
+                
+                if editDlg.type:
+                    sql = ("update " + self.schema + ".samples set sample_type='" + editDlg.type +  "' where sample_id=" + selRecord[0])
+                    self.db.dbExec(sql)
+
+                    rowIdx = self.speciesList.currentRow()
+                    self.speciesList.setItem(rowIdx, 2, QTableWidgetItem(editDlg.type))
+                
+                self.reloadSamplesList()
+            else:
+                self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
+                        "Sample cannot be edited since specimens associated with this " \
+                        "sample already exist",'info')
+                self.message.exec()
+
 
         self.freeze=False
 
@@ -1280,6 +1423,61 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         self.returnFlag=False
 
+# --- BEGIN NEW ANIMALIA/PRESENT VALIDATION ---
+        # Check if there is any sample with sample_type = 'Present'
+        sql = ("SELECT COUNT(sample_id) FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+               " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+               " AND partition='" + self.activePartition + "' AND sample_type='Present'")
+        query = self.db.dbQuery(sql)
+        presentCount, = query.first()
+        
+        if presentCount and int(presentCount) > 0:
+            # We have a 'Present' sample, now check if Animalia (202423) exists in this partition
+            sql = ("SELECT COUNT(sample_id) FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+                   " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+                   " AND partition='" + self.activePartition + "' AND species_code=202423 AND sample_type='Species'")
+            query = self.db.dbQuery(sql)
+            animaliaCount, = query.first()
+            
+            if not animaliaCount or int(animaliaCount) == 0:
+                self.message.setMessage(self.errorIcons[2], self.errorSounds[1],
+                        self.firstName + ", there is a sample marked as 'Present' but no 'Animalia' species was found. " +
+                        "Please add the Animalia species and weigh group before continuing.", 'info')
+                self.message.exec()
+                self.returnFlag = True
+                return
+        # --- END NEW ANIMALIA/PRESENT VALIDATION ---
+
+        #  check if all of the samples have at least one basket. First get the samples
+        sql = ("SELECT species.common_name, samples.sample_id, samples.species_code, " +
+                "samples.subcategory FROM " + self.schema + ".samples, " + self.schema + ".species WHERE " +
+                "species.species_code=samples.species_code AND LOWER(samples.sample_type)" +
+                "='species' AND samples.ship=" + self.ship + " AND samples.survey=" +
+                self.survey + " AND samples.event_id=" + self.activeHaul +
+                " AND samples.partition='" + self.activePartition + "'")
+        sampleQuery = self.db.dbQuery(sql)
+
+        #  loop thru each sample and check if it has at least one basket
+        for commonName, sampleId, spCode, subcat in sampleQuery:
+            sql = ("SELECT COUNT(basket_id) FROM " + self.schema + ".baskets WHERE ship="+self.ship+" AND survey="+
+                    self.survey+" AND event_id = "+self.activeHaul+" AND sample_id = "+
+                    sampleId)
+            basketQuery = self.db.dbQuery(sql)
+            numBaskets, = basketQuery.first()
+
+            if int(numBaskets) == 0:
+                # no baskets for this species
+                if subcat.lower() != 'none':
+                    spcName = commonName + " " + subcat
+                else:
+                    spcName = commonName
+                self.message.setMessage(self.errorIcons[1],self.errorSounds[1],
+                        self.firstName + ", There are are no basket weights for " +
+                        spcName + ". Does this bother you?", 'choice')
+                if self.message.exec():
+                    self.returnFlag = True
+                    return
+
         #  check for any mixes in this partition
         sql = ("SELECT sample_id, sample_type, species_code from " + self.schema + ".samples WHERE ship=" +
                 self.ship + " AND survey=" + self.survey+" AND event_id = " +
@@ -1290,13 +1488,6 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
             #  mix validation
             (mixSubWeight, mixSpeciesWeight) = self.mixValidation(sampleId, self.activeSpcCode)
-            if mixSubWeight == 0:
-                self.message.setMessage(self.errorIcons[1],self.errorSounds[1],
-                        self.firstName+ ", there's no mix basket subsample weight for "+
-                        sampleType + " in the system. This must be corrected.", 'info')
-                self.message.exec()
-                self.returnFlag = True
-                return
 
             #  check the mix parts more or less make up the weight of the total
             dev = (mixSubWeight - mixSpeciesWeight) / mixSubWeight * 100.
@@ -1312,92 +1503,51 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                     #  user is bothered by this - set the failed validation flag
                     self.returnFlag = True
                 else:
-                    if speciesCode in self.parentSamples:
-                        #  user doesn't care, make note of this and move on
-                        sql = ("INSERT INTO overrides (scientist, record_id, " +
-                                "table_name,description) VALUES ('" + self.scientist + "'," +
-                                self.parentSamples[speciesCode] + ",'sample', 'mix components are "+str(dev)+
-                                " % less than the mix subsample weight')")
-                        self.db.dbExec(sql)
-
-        #  check if all of the samples have at least one basket. First get the samples
-        sql = ("SELECT species.common_name, samples.sample_id, samples.species_code, " +
-                "samples.subcategory FROM " + self.schema + ".samples, " + self.schema + ".species WHERE " +
-                "species.species_code=samples.species_code AND (LOWER(samples.sample_type)" +
-                "='species' OR LOWER(samples.sample_type) LIKE LOWER('%mix%')) " +
-                "AND samples.ship=" + self.ship + " AND samples.survey=" +
-                self.survey + " AND samples.event_id=" + self.activeHaul +
-                " AND samples.partition='" + self.activePartition + "'")
-        sampleQuery = self.db.dbQuery(sql)
-
-        #  loop thru each sample and check if it has at least one basket
-        for commonName, sampleId, spCode, subcat in sampleQuery:
-            sql = ("SELECT COUNT(basket_id) FROM " + self.schema + ".baskets WHERE ship="+self.ship+" AND survey="+
-                    self.survey+" AND event_id = "+self.activeHaul+" AND sample_id = "+
-                    sampleId)
-            basketQuery = self.db.dbQuery(sql)
-            numBaskets, = basketQuery.first()
-
-            if numBaskets == 0:
-                # no baskets for this species
-                if subcat.lower() != 'none':
-                    spcName = commonName + " " + subcat
-                else:
-                    spcName = commonName
-                self.message.setMessage(self.errorIcons[1],self.errorSounds[1],
-                        self.firstName + ", There are are no basket weights for " +
-                        spcName + ". Does this bother you?", 'choice')
-                if self.message.exec():
-                    self.returnFlag = True
-                    return
-
-            # As part of the last open station check, process should
-            # check for empty baskets and allow for deletion.
-
-                # we're commenting this out because its caousing problems with multi catch input
-#                    else:
-#                        # remove stray sample record
-#                        query =QtSql.QSqlQuery("DELETE FROM samples WHERE ship="+self.ship+" AND survey="+
-#                                        self.survey+" AND event_id = "+self.activeHaul+" AND sample_id = "+query.value(1).toString(),  self.db)
-#                        self.backLogger.info(QDateTime.currentDateTime().toString('MMddyyyy hh:mm:ss')+","+query.lastQuery())
-
+                    #  user doesn't care, make note of this and move on
+                    sql = ("INSERT INTO " + self.schema + ".overrides (scientist, record_id, " +
+                            "table_name, description, ship, survey, event_id) SELECT '" + 
+                            self.scientist + "'," + sampleId + ",'sample', 'mix components are "+str(dev)+
+                            " % less than the mix subsample weight', "+self.ship+","+self.survey+","+
+                            self.activeHaul+" WHERE NOT EXISTS (SELECT 1 FROM " + self.schema + 
+                            ".overrides WHERE record_id=" + sampleId + " AND table_name='sample' AND ship="+
+                            self.ship+" AND survey="+self.survey+" AND event_id="+self.activeHaul+")")
+                    self.db.dbExec(sql)
 
     def mixValidation(self, sampleId, speciesCode):
-        '''mixValidation queries out the mix subsample weight and the
-        species weight for the specified mix sample ID and species.
+        #  get the SubMix sample id for this partition
+        subMixCode = "3"
+        animaliaCode = "202423"
 
-        '''
-        #  get the mix subsample weight
-        mixSubWeight = 0
-        sql = ("SELECT SUM(weight) FROM " + self.schema + ".baskets WHERE ship="+self.ship+" AND survey="+
-                self.survey+" AND event_id = "+self.activeHaul+" AND sample_id="+sampleId+
-                " AND basket_type = 'Measure'")
+        sql = ("SELECT sample_id FROM " + self.schema + ".samples WHERE ship=" + self.ship +
+                " AND survey=" + self.survey + " AND event_id=" + self.activeHaul +
+                " AND species_code=" + subMixCode)
         query = self.db.dbQuery(sql)
-        subWeight, = query.first()
-        if subWeight:
-            try:
-                mixSubWeight = (float(subWeight))
-            except:
-                pass
+        submix1Id, = query.first()
 
-        #  get the mix species weight
-        mixSpeciesWeight = 0
-        sql = ("SELECT SUM(baskets.weight) FROM " + self.schema + ".samples, baskets WHERE samples.sample_id = "+
-                "baskets.sample_id AND samples.ship=baskets.ship AND " +
-                "samples.survey=baskets.survey AND samples.event_id=baskets.event_id " +
-                "AND samples.ship="+self.ship+" AND samples.survey="+
-                self.survey+" AND samples.event_id="+self.activeHaul+" AND samples.partition='"+
-                self.activePartition+"' AND samples.parent_sample="+sampleId)
-        query = self.db.dbQuery(sql)
-        mixWeight, = query.first()
-        if mixWeight:
-            try:
-                mixSpeciesWeight = (float(mixWeight))
-            except:
-                pass
+        if submix1Id is not None:
+            #  get the sum of Measure basket weights for Animalia species with SubMix1 as parent
+            sql = ("SELECT SUM(b.weight) FROM " + self.schema + ".baskets b, " +
+                    self.schema + ".samples s WHERE b.sample_id=s.sample_id AND " +
+                    "b.ship=s.ship AND b.survey=s.survey AND b.event_id=s.event_id AND " +
+                    "s.ship=" + self.ship + " AND s.survey=" + self.survey +
+                    " AND s.event_id=" + self.activeHaul + " AND b.basket_type='Measure' AND " +
+                    "s.species_code=" + animaliaCode)
+            query = self.db.dbQuery(sql)
+            mixSubWeight, = query.first()
+            mixSubWeight = float(mixSubWeight) if mixSubWeight else 0.0
 
-        return mixSubWeight, mixSpeciesWeight
-
+            #  get the sum of Count basket weights for species samples with SubMix1 as parent
+            sql = ("SELECT SUM(b.weight) FROM " + self.schema + ".baskets b, " +
+                    self.schema + ".samples s WHERE b.sample_id=s.sample_id AND " +
+                    "b.ship=s.ship AND b.survey=s.survey AND b.event_id=s.event_id " +
+                    "AND s.ship=" + self.ship + " AND s.survey=" + self.survey +
+                    " AND s.event_id=" + self.activeHaul + " AND s.parent_sample=" +
+                    submix1Id + " AND b.basket_type='Count'")
+            query = self.db.dbQuery(sql)
+            countBasketWeight, = query.first()
+            mixSpeciesWeight = float(countBasketWeight) if countBasketWeight else 0.0
+        
+            return mixSubWeight, mixSpeciesWeight
 
     def reloadSamplesList(self):
         '''reloadSamplesList updates the Samples table
@@ -1436,7 +1586,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 "samples.ship="+self.ship+" AND samples.survey=" + self.survey +
                 " AND samples.event_id="+self.activeHaul+" AND samples.partition='"+
                 self.activePartition+"' AND samples.species_code NOT IN " +
-                "(1,100000,100001) ORDER BY samples.sample_id ASC")
+                "(1,3,100000,100001) ORDER BY samples.sample_id ASC")
         sampleQuery = self.db.dbQuery(sql)
         for sampleId, commonName, sciName, spCode, parentId, subcat, sample_type in sampleQuery:
             #  get the namespace - if the species is added using common name,
@@ -1516,9 +1666,21 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                                  self.schema + ".protocol_map WHERE species_code=" + spCode)
                     proto_query = self.db.dbQuery(proto_sql)
                     sp_protos = ['BagNTag']
+                    # group collections to highlight in green
+                    green_protos = ['Eulachon', 'Salmon','Hake','Pacific Sardine','Mackerels',
+                                 'Northern Anchovy','Small_Pelagics']
                     for protocol, sp_code in proto_query:
+                        # Add the protocol to our list for the loop
                         sp_protos.append(protocol)
-                        self.speciesList.item(nSamples, 0).setBackground(QColor(127, 255, 212))
+                        
+                        # for protocols in group collection, highlight them in green
+                        if (protocol in green_protos):
+                            # Green
+                            self.speciesList.item(nSamples, 0).setBackground(QColor(127, 255, 212))
+                            break
+                        else:
+                            # Yellow
+                            self.speciesList.item(nSamples, 0).setBackground(QColor(255, 222, 128))
                     self.speciesProtos[spCode] = sp_protos
 
             nSamples += 1
@@ -1614,7 +1776,7 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             commentText = ' '.join(newComment)
 
             #  update the comment in samples
-            sql = ("UPDATE samples SET comments='" + commentText + "' WHERE ship="+self.ship +
+            sql = ("UPDATE " + self.schema + ".samples SET comments='" + commentText + "' WHERE ship="+self.ship +
                     " AND survey=" + self.survey + " AND event_id = " + self.activeHaul +
                     " AND sample_id = "+self.activeSampleKey)
             self.db.dbExec(sql)
@@ -1638,9 +1800,9 @@ class sortedCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             #  the event to close the dialog.
             event.accept()
 
-            #  store the window size and position
-            self.appSettings.setValue('winposition', self.pos())
-            self.appSettings.setValue('winsize', self.size())
+        #  store the window size and position
+        self.appSettings.setValue('winposition', self.pos())
+        self.appSettings.setValue('winsize', self.size())
 
     def resizeEvent(self, event):
 

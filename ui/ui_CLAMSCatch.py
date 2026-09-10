@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260\CLAMS\ui\CLAMSCatch.ui'
+# Form implementation generated from reading ui file 'CLAMSCatch.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -313,6 +313,13 @@ class Ui_clamsCatch(object):
         self.horizontalLayout_3.addWidget(self.commentBtn)
         spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_3.addItem(spacerItem)
+        self.unsortedBtn = QtWidgets.QPushButton(parent=clamsCatch)
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(14)
+        self.unsortedBtn.setFont(font)
+        self.unsortedBtn.setObjectName("unsortedBtn")
+        self.horizontalLayout_3.addWidget(self.unsortedBtn)
         self.doneBtn = QtWidgets.QPushButton(parent=clamsCatch)
         self.doneBtn.setMinimumSize(QtCore.QSize(165, 35))
         font = QtGui.QFont()
@@ -367,4 +374,15 @@ class Ui_clamsCatch(object):
         self.manualBtn.setText(_translate("clamsCatch", "Manual Weight"))
         self.printBtn.setText(_translate("clamsCatch", "Print Label"))
         self.commentBtn.setText(_translate("clamsCatch", "Comment"))
+        self.unsortedBtn.setText(_translate("clamsCatch", "Move To Unsorted Baskets"))
         self.doneBtn.setText(_translate("clamsCatch", "Done"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    clamsCatch = QtWidgets.QDialog()
+    ui = Ui_clamsCatch()
+    ui.setupUi(clamsCatch)
+    clamsCatch.show()
+    sys.exit(app.exec())

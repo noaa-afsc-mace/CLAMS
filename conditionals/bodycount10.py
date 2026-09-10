@@ -10,13 +10,11 @@
 
 '''
 
-from PyQt4.QtCore import *
-from PyQt4 import QtSql
-from math import ceil
+from PyQt6.QtCore import *
 
 class BodyCount10(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -42,7 +40,7 @@ class BodyCount10(QObject):
         
         if self.cnt > 10:
             try:
-                result[measurements.index('whole_fish')] = False
+                result[measurements.index('whole_fish')] = [False]
             except:
                 pass
                 

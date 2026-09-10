@@ -23,6 +23,7 @@ class Ichthysetupdlg(QDialog, ui_IcthystickSetup.Ui_IchthystickSetup):
         self.serial_threads_finished = True
         self.db = db
         self.workStation = workstation
+        self.schema = parent.schema
 
         #  restore the application state
         self.appSettings = QSettings('FIC', 'IchthyInit')

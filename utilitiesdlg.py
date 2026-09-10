@@ -54,6 +54,7 @@ class UtilitiesDlg(QDialog, ui_UtilitiesDlg.Ui_utilitiesdlg):
         self.survey=parent.survey
         self.settings=parent.settings
         self.workStation=parent.workStation
+        self.schema=parent.schema
 
         #  set up signals
         self.setupBtn.clicked.connect(self.setupDevices)

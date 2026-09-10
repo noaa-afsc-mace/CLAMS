@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class GonadWeightLimit(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -77,7 +77,9 @@ class GonadWeightLimit(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -96,17 +98,17 @@ class GonadWeightLimit(QObject):
             if str(sex).lower()=='male':
 
                 if 'ovary_taken' in measurements:
-                    result[measurements.index('ovary_taken')]=False
+                    result[measurements.index('ovary_taken')]=[False]
                 if 'liver_weight' in measurements:
-                    result[measurements.index('liver_weight')]=False
+                    result[measurements.index('liver_weight')]=[False]
                 if 'gonad_weight' in measurements:
-                    result[measurements.index('gonad_weight')]=False
+                    result[measurements.index('gonad_weight')]=[False]
 
             else: # sex is female
                 if maturity:
                     if not maturity in self.stages:
                         if 'gonad_weight' in measurements:
-                            result[measurements.index('gonad_weight')]=False
+                            result[measurements.index('gonad_weight')]=[False]
 
 
         return result
@@ -119,7 +121,9 @@ This class will need to be customized a bit for each individual validation.
 '''
 class conditionalTest(unittest.TestCase):
     db = None
-    gonadWeightLimit = GonadWeightLimit(db)
+    schema = None
+    speciesCode = None
+    gonadWeightLimit = GonadWeightLimit(db, schema, speciesCode)
 
     measurements = ['sex', 'maturity', 'ovary_taken', 'liver_weight', 'gonad_weight']
 
@@ -128,7 +132,7 @@ class conditionalTest(unittest.TestCase):
         results = [1, 2, 3, 4, 5]
 
         ok = self.gonadWeightLimit.evaluate(self.measurements, values, results)
-        self.assertEqual([1, 2, False, False, False], ok)
+        self.assertEqual([1, 2, [False], [False], [False]], ok)
 
     def testFemaleImmature(self):
         values = ['female', 'Immature']
@@ -142,7 +146,7 @@ class conditionalTest(unittest.TestCase):
         results = [1, 2, 3, 4, 5]
 
         ok = self.gonadWeightLimit.evaluate(self.measurements, values, results)
-        self.assertEqual([1, 2, 3, 4, False], ok)
+        self.assertEqual([1, 2, 3, 4, [False]], ok)
 
 if __name__ == '__main__':
     unittest.main()

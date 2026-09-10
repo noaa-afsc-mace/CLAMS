@@ -97,8 +97,8 @@ class BarcodeDuplicate(QObject):
         '''
 
         #  see if this barcode exists for any survey in the database.
-        sql = ("SELECT device_id FROM "+ self.schema + ".measurements WHERE measurement_type in" +
-                "('barcode', 'alpha_barcode') AND measurement_value ='" + currentValue + "'")
+        sql = (f"SELECT device_id FROM {self.schema}.measurements WHERE measurement_type in "
+               f"('dna_barcode', 'barcode', 'alpha_barcode','stomach_barcode') AND measurement_value ='{currentValue}'")
         query = self.db.dbQuery(sql)
         isbarCode,  = query.first()
         

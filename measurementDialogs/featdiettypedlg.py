@@ -44,6 +44,10 @@
 |               - added some function explanation
 |               - fixed any PEP8 issues
 |               - added a main to test if works (commented out)
+| Updated June 2026 by:
+|        Alicia Billings <alicia.billings@noaa.gov>
+|           specific updates:
+|               - cleaning up queries
 |
 | NOTE: cannot test this until it is called with parent values
 """
@@ -68,28 +72,25 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         self.message = messagedlg.MessageDlg(self)
 
         self.result = OrderedDict()
-
         self.survey = parent.survey
         self.ship = parent.ship
         self.activeSpcName = parent.activeSpcName
         self.activeSpcCode = parent.activeSpcCode
         self.active_event = parent.activeHaul
         self.active_sample = parent.activeSample
+        self.lengthTypeBox = parent.lengthTypeBox
         self.settings = parent.settings
         self.edit_flag = parent.editFieldFlag
         self.specimen_key = parent.specimenKey
+        self.schema = parent.schema
         self.errorIcons = parent.errorIcons
         self.errorSounds = parent.errorSounds
         self.settings = parent.settings
-        self.ip = parent.ip
-        self.port = parent.port
-        self.printer_connected = parent.printer_connected
         self.printer = parent.printer
         self.db = parent.db
         self.schema = parent.schema
-        self.called_enable = self.settings['called_enable']
-        # self.called_enable = False
-        self.settings = {}
+        self.called_enable = self.settings['DietCalledEnable']
+        #self.settings = {}
 
         self.oto_present = False
         self.oto_last = 0
@@ -98,7 +99,11 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         self.collected = ""
         self.called = ""
 
-        self.called_enable = False
+        if self.called_enable:
+            if self.called_enable == 'True':
+                self.called_enable = True
+            else:
+                self.called_enable = False
 
         # hide the species code buttons
         self.pb_code_1.hide()
@@ -157,23 +162,21 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         if not self.edit_flag:
             # check collected and called numbers
             # get total already collected and called
-            collection_sql = "SELECT COUNT(*) FROM " + self.schema + ".Measurements WHERE event_id = " + self.active_event + \
-                             " AND measurement_type = 'stomach_collect'"\
-                             " AND measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')"
+            collection_sql = (f"SELECT COUNT(*) FROM {self.schema}.measurements WHERE event_id = {self.active_event} "
+                              f"AND measurement_type = 'stomach_collect' "
+                              f"AND measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')")
             collection_query = self.db.dbQuery(collection_sql)
 
-            collection_query.first()
-            self.collected = int(collection_query.value(0).toString())
+            self.collected = int(collection_query.first()[0])
             if self.collected >= self.tot_collect:
                 self.tw_stom_type.setTabEnabled(0, False)
 
             # get total already collected and called
-            called_sql = "SELECT COUNT(*) FROM " + self.schema + ".Measurements WHERE event_id = " + self.active_event + \
-                         " AND measurement_type = 'stom_cont_1" \
-                         " AND measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')"
+            called_sql = (f"SELECT COUNT(*) FROM {self.schema}.measurements WHERE event_id = {self.active_event} "
+                          f"AND measurement_type = 'stom_cont_1' AND "
+                          f"measurement_value NOT IN ('Blown', 'Nicked', 'Regurg', 'Unknown')")
             called_query = self.db.dbQuery(called_sql)
-            called_query.first()
-            self.called = int(called_query.value(0).toString())
+            self.called = int(called_query.first()[0])
             if self.called >= self.tot_called:
                 self.tw_stom_type.setTabEnabled(1, False)
 
@@ -220,13 +223,13 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         """
         self.oto_present = False
         if self.specimen_key is not None:
-            exist_sql = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE ship=" + self.ship + \
-                        " AND survey=" + self.survey + " AND event_id=" + self.active_event + \
-                        " AND sample_id=" + self.active_sample + " AND specimen_id=" + self.specimen_key + \
-                        " AND measurement_type = 'barcode'"
+            exist_sql = (f"SELECT measurement_value FROM {self.schema}.measurements WHERE ship={self.ship} "
+                         f"AND survey={self.survey} AND event_id={self.active_event} "
+                         f"AND sample_id={self.active_sample} AND specimen_id={self.specimen_key} "
+                         f"AND measurement_type = 'barcode'")
             exist_query = self.db.dbQuery(exist_sql)
             if exist_query.first():
-                self.oto_last = exist_query.value(0).toString()[-5:]
+                self.oto_last = exist_query.first()[0]
                 self.oto_present = True
 
     def load_measures(self):
@@ -241,16 +244,16 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         measures_to_load = ['stomach_collect', 'stom_cont_1', 'stom_cont_2', 'stom_cont_3',
                             'stom_vol_1', 'stom_vol_2', 'stom_vol_3', 'stom_overall_wt']
         for measure in measures_to_load:
-            query_txt = "SELECT measurement_value FROM " + self.schema + ".Measurements WHERE measurement_type = '%s' " \
-                        "AND specimen_id = %s" % (measure, self.specimen_key)
+            query_txt = (f"SELECT measurement_value FROM {self.schema}.measurements "
+                         f"WHERE measurement_type = '{measure}' AND specimen_id = {self.specimen_key}")
             query = self.db.dbQuery(query_txt)
             if query.first():
-                value = query.value(0).toString()
+                value = query.first()[0]
                 if measure == 'stomach_collect':
                     self.l_cur_code.setText(str(value))
                     if str(value) not in ['Blown', 'Regurg', 'Nicked', 'Unknown']:
                         self.pb_taken.setText("Reprint label")
-                elif measure == 'stom_cont_1':
+                elif measure == 'stom_cont_1' and self.called_enable:
                     if value not in ['Blown', 'Regurg', 'Nicked', 'Unknown']:
                         self.pb_not_taken_2.setText("Can't take contents")
                         self.pb_code_1.setText(str(value))
@@ -259,17 +262,17 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
                         self.pb_not_taken_2.setText(str(value))
                         self.pb_code_1.setText("species_code")
                         self.pb_sp_1.setText("Species 1")
-                elif measure == 'stom_cont_2':
+                elif measure == 'stom_cont_2' and self.called_enable:
                     self.pb_code_2.setText(str(value))
                     self.pb_sp_3.setText(self.get_sp(value))
-                elif measure == 'stom_cont_3':
+                elif measure == 'stom_cont_3' and self.called_enable:
                     self.pb_code_3.setText(str(value))
                     self.pb_sp_3.setText(self.get_sp(value))
-                elif measure == 'stom_vol_1':
+                elif measure == 'stom_vol_1' and self.called_enable:
                     self.pb_vol_1.setText(str(value))
-                elif measure == 'stom_vol_2':
+                elif measure == 'stom_vol_2' and self.called_enable:
                     self.pb_vol_2.setText(str(value))
-                elif measure == 'stom_vol_3':
+                elif measure == 'stom_vol_3' and self.called_enable:
                     self.pb_vol_3.setText(str(value))
                 elif measure == 'stom_overallwt':
                     self.pb_overall.setText(str(value))
@@ -299,10 +302,10 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         returns the species name for the code
         :return: species name - scientific
         """
-        query_txt = "SELECT scientific_name FROM " + self.schema + ".Species WHERE species_code = " + sp_code
+        query_txt = f"SELECT scientific_name FROM {self.schema}.species WHERE species_code = {sp_code}"
         query = self.db.dbQuery(query_txt)
         query.first()
-        return query.value(0).toString()
+        return query.first()[0]
 
     def taken(self):
         """
@@ -332,14 +335,14 @@ class FEATDietTypeDlg(QDialog, ui_FEATDietTypeDlg.Ui_Dialog):
         if reasons.result() == 1:
             self.pb_done.setEnabled(True)
             if location == "collect":
-                self.result["diet_collection"] = "Not Taken"
+                self.result["diet_collection"] = "Not collected"
                 self.result["stomach_collect"] = reasons.reason
             else:
                 if reasons.reason == 'Empty':
                     self.result['diet_collection'] = 'Contents'
                     self.result['stom_cont_1'] = reasons.reason
                 else:
-                    self.result["diet_collection"] = "Not Sampled"
+                    self.result["diet_collection"] = "No contents"
                     self.result["stom_cont_1"] = reasons.reason
 
             self.accept()
@@ -455,13 +458,15 @@ class GetLabel(QDialog):
         super(QDialog, self).__init__(parent)
         self.survey = parent.survey
         self.ship = parent.ship
+        self.db = parent.db
+        self.schema = parent.schema
         self.activeSpcName = parent.activeSpcName
         self.activeSpcCode = parent.activeSpcCode
         self.active_event = parent.active_event
         self.specimen_key = parent.specimen_key
+        self.lengthTypeBox = parent.lengthTypeBox
         self.code = ""
         self.settings = parent.settings
-        self.printer_connected = parent.printer_connected
         self.printer = parent.printer
         self.message = parent.message
         self.errorIcons = parent.errorIcons
@@ -495,38 +500,27 @@ class GetLabel(QDialog):
         creates the small popup to prompt user to print the label
         :return:
         """
-        # todo: how to get length and weight to print on the label
-        # length, weight = fun.get_len_wt(self.specimen_key)
-        length = weight = None
-        # create the barcode
-        self.code = str(str(self.survey) + str(self.ship) + str(self.active_event)
-                        + str(self.oto_last))
-
+        # create the barcode number
+        self.code = str(self.survey) + str(self.ship) + str(self.active_event).zfill(3) + str(self.specimen_key)
         # set the project
         project = "Stomach"
         if self.printer is not None:
-            if self.printer_connected:
-                # test again, just to be sure
-                if self.printer.printer_status():
-                    self.printer.print_label(project, self.activeSpcName, self.activeSpcCode, self.active_event,
-                                             self.code, self.specimen_key, length, weight)
-                else:
-                    self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
-                                            "Printer not responding, please use a paper label",
-                                            'info')
-                    self.message.exec_()
-            else:
-                self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
-                                        "Printer not responding, please use a paper label",
-                                        'info')
-                self.message.exec_()
+            lengthType = str(self.lengthTypeBox.currentText())
+            lw_sql = (f"SELECT {lengthType}, organism_weight FROM {self.schema}.v_specimen_measurements "
+                      f"WHERE survey={self.survey} AND ship={self.ship} AND event_id={self.active_event} "
+                      f"AND specimen_id={self.specimen_key}")
+            lw_query = self.db.dbQuery(lw_sql)
+            length, weight = lw_query.first()
+            self.printer.print_label(project, self.activeSpcName, self.activeSpcCode, self.active_event,
+                                     self.code, self.specimen_key, length, weight, self.settings['OrganizationName'])
+
         else:
             # otherwise, prompt to fill out a label
             self.message.setMessage(self.errorIcons[2], self.errorSounds[2],
                                     "No printer is configured for this station, please use a paper label with "
                                     "specimen number " + self.oto_last,
                                     'info')
-            self.message.exec_()
+            self.message.exec()
 
         # print sound
         # if self.printSound:
@@ -679,44 +673,47 @@ class GetStomachSpecies(QDialog, ui_FEATDietSpDlg.Ui_Dialog):
         if self.r_com.isChecked():
             # if chars are empty, return full list of species in Species_Data that are stomach_species
             if self.chars == '':
-                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code IN " \
-                            "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' " \
-                            "AND parameter_value = 1) ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code IN " \
-                            "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' " \
-                            "AND parameter_value = 1) ORDER BY species.scientific_name"
+                com_query = (f"SELECT species.common_name FROM {self.schema}.species WHERE species_code IN "
+                                f"(SELECT species_code FROM {self.schema}.species_data "
+                                f"WHERE species_parameter = 'stomach_species' AND parameter_value = 1) "
+                             f"ORDER BY species.common_name")
+                sci_query = (f"SELECT species.scientific_name FROM {self.schema}.species WHERE species_code IN "
+                                f"(SELECT species_code FROM {self.schema}.species_data "
+                                f"WHERE species_parameter = 'stomach_species' AND parameter_value = 1) "
+                             f"ORDER BY species.scientific_name")
             else:
-                com_query = ("SELECT species.common_name FROM " + self.schema + ".species WHERE species_code IN "
-                             "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' "
-                             "AND parameter_value = 1) AND upper(species.common_name)" +
-                             "LIKE upper('%" + self.chars + "%') ORDER BY species.common_name")
-                sci_query = ("SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code IN "
-                             "(SELECT species_code FROM " + self.schema + ".Species_Data WHERE species_parameter = 'stomach_species' "
-                             "AND parameter_value = 1) AND upper(species.scientific_name) " +
-                             "('%" + self.chars + "%') ORDER BY species.scientific_name")
+                com_query = (f"SELECT species.common_name FROM {self.schema}.species WHERE species_code IN "
+                                f"(SELECT species_code FROM {self.schema}.species_data "
+                                f"WHERE species_parameter = 'stomach_species' AND parameter_value = 1) "
+                             f"AND upper(species.common_name) "
+                             f"LIKE upper('%{self.chars}%') ORDER BY species.common_name")
+                sci_query = (f"SELECT species.scientific_name FROM {self.schema}.species WHERE species_code IN "
+                                f"(SELECT species_code FROM {self.schema}.species_data "
+                                f"WHERE species_parameter = 'stomach_species' AND parameter_value = 1) "
+                             f"AND upper(species.scientific_name) ('%{self.chars}%') ORDER BY species.scientific_name")
         else:
             if self.chars == '':
-                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code != -1 " \
-                            "ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code != -1 " \
-                            "ORDER BY species.scientific_name"
+                com_query = (f"SELECT species.common_name FROM {self.schema}.species WHERE species_code != -1 "
+                             f"ORDER BY species.common_name")
+                sci_query = (f"SELECT species.scientific_name FROM {self.schema}.species WHERE species_code != -1 "
+                             f"ORDER BY species.scientific_name")
             else:
-                com_query = "SELECT species.common_name FROM " + self.schema + ".species WHERE species_code != -1 AND "\
-                            "upper(species.common_name) LIKE upper('%" + self.chars + \
-                            "%') ORDER BY species.common_name"
-                sci_query = "SELECT species.scientific_name FROM " + self.schema + ".species WHERE species_code != -1 AND " \
-                            "upper(species.scientific_name) LIKE upper('%" + self.chars + \
-                            "%') ORDER BY species.scientific_name"
+                com_query = (f"SELECT species.common_name FROM {self.schema}.species WHERE species_code != -1 "
+                             f"AND upper(species.common_name) LIKE upper('%{self.chars}%') "
+                             f"ORDER BY species.common_name")
+                sci_query = (f"SELECT species.scientific_name FROM {self.schema}.species WHERE species_code != -1 "
+                             f"AND upper(species.scientific_name) LIKE upper('%{self.chars}%') "
+                             f"ORDER BY species.scientific_name")
         query = self.db.dbQuery(com_query)
         trunc = []
         while query.next():
-            trunc.append(query.value(0).toString())
+            trunc.append(query.first()[0])
         self.lw_com.addItems(trunc)
 
         query = self.db.dbQuery(sci_query)
         trunc1 = []
         while query.next():
-            trunc1.append(query.value(0).toString())
+            trunc1.append(query.first()[0])
         self.lw_sci.addItems(trunc1)
 
         if len(trunc) < 2 and self.nameTab.currentIndex == 0:
@@ -760,13 +757,13 @@ class GetStomachSpecies(QDialog, ui_FEATDietSpDlg.Ui_Dialog):
         list_origin = self.sender()
         active_name = list_origin.currentItem().text()
         if self.nameTab.currentIndex() == 0:
-            sql = "SELECT species_code FROM " + self.schema + ".species WHERE common_name='" + active_name + "'"
+            sql = f"SELECT species_code FROM {self.schema}.species WHERE common_name='{active_name}'"
             query = self.db.dbQuery(sql)
         else:
-            sql = "SELECT species_code FROM " + self.schema + ".species WHERE scientific_name='" + active_name + "'"
+            sql = f"SELECT species_code FROM {self.schema}.species WHERE scientific_name='{active_name}'"
             query = self.db.dbQuery(sql)
         query.first()
-        sp_code = query.value(0).toString()
+        sp_code = query.first()[0]
         img_name = sp_code
 
         # load label

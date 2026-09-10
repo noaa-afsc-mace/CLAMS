@@ -410,7 +410,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="doneBtn">
+      <widget class="QPushButton" name="sortedBtn">
        <property name="minimumSize">
         <size>
          <width>165</width>
@@ -427,6 +427,25 @@
        </property>
        <property name="text">
         <string>Move to Sorted Baskets</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="doneBtn">
+       <property name="minimumSize">
+        <size>
+         <width>165</width>
+         <height>35</height>
+        </size>
+       </property>
+       <property name="font">
+        <font>
+         <family>Arial Black</family>
+         <pointsize>14</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Done</string>
        </property>
       </widget>
      </item>

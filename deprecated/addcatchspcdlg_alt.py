@@ -54,7 +54,7 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
                 window.width(), window.height())
 
         # set default tab, get past haul species
-        query=QtSql.QSqlQuery("SELECT event_id FROM events WHERE survey = "+self.survey+
+        query=QtSql.QSqlQuery("SELECT event_id FROM " + self.schema + ".events WHERE survey = "+self.survey+
                 " AND event_id <= "+self.activeHaul+"")
         self.hauls=[]
         while query.next():
@@ -109,12 +109,12 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
     def getList(self):
 
         if self.chars=='':
-            commonQuery = "SELECT species.common_name FROM species ORDER BY species.common_name"
-            sciQuery = "SELECT species.scientific_name FROM species ORDER BY species.scientific_name"
+            commonQuery = "SELECT species.common_name FROM " + self.schema + ".species ORDER BY species.common_name"
+            sciQuery = "SELECT species.scientific_name FROM " + self.schema + ".species ORDER BY species.scientific_name"
         else:
-            commonQuery = ("SELECT species.common_name FROM species WHERE upper(species.common_name)" +
+            commonQuery = ("SELECT species.common_name FROM " + self.schema + ".species WHERE upper(species.common_name)" +
                 "LIKE upper('"+ self.chars+"%') ORDER BY species.common_name")
-            sciQuery = ("SELECT species.scientific_name FROM species WHERE upper(species.scientific_name) "+
+            sciQuery = ("SELECT species.scientific_name FROM " + self.schema + ".species WHERE upper(species.scientific_name) "+
                 "LIKE upper('"+self.chars+"%') ORDER BY species.scientific_name")
 
         query=QtSql.QSqlQuery(commonQuery)
@@ -145,19 +145,19 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
         if self.nameTab.currentIndex()==0:
             self.nameType='common'
             query=QtSql.QSqlQuery("SELECT species.species_code  "+
-                    "FROM species WHERE species.common_name='"+
+                    "FROM " + self.schema + ".species WHERE species.common_name='"+
                     self.listOrigin.currentItem().text()+"'")
         else:
             self.nameType='scientific'
             query=QtSql.QSqlQuery("SELECT species.species_code  "+
-                    "FROM species WHERE species.scientific_name='"+
+                    "FROM " + self.schema + ".species WHERE species.scientific_name='"+
                     self.listOrigin.currentItem().text()+"'")
         query.first()
         self.activeSpcCode=query.value(0).toString()
         imgName=None
 
         # check for multiple subcategories
-        query=QtSql.QSqlQuery("SELECT subcategory FROM species_associations WHERE species_code="+
+        query=QtSql.QSqlQuery("SELECT subcategory FROM " + self.schema + ".species_associations WHERE species_code="+
                 self.activeSpcCode)
         subcats=[]
         while query.next():
@@ -184,7 +184,7 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
             imgName=self.activeSpcCode
             labelText=self.activeSpcName
         # find out previous occurence
-        query=QtSql.QSqlQuery("SELECT parameter_value  "+ "FROM species_data WHERE species_code="+
+        query=QtSql.QSqlQuery("SELECT parameter_value  "+ "FROM " + self.schema + ".species_data WHERE species_code="+
                 self.activeSpcCode+" AND subcategory='"+self.activeSpcSubcat+
                 "' AND lower(species_parameter)='previous_occurrence'")
         if query.first():
@@ -254,14 +254,15 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
             count=self.history
         for i in range(count-1):
             hauls=(hauls+","+str(self.hauls[i+1]))
-        query=QtSql.QSqlQuery("SELECT species.common_name, species.species_code FROM species INNER " +
+        query=QtSql.QSqlQuery("SELECT species.common_name, species.species_code FROM " + self.schema + ".species INNER " +
                 "JOIN samples ON species.species_code=samples.species_code WHERE (samples.event_id in("+
                 hauls+") AND (samples.survey = "+self.survey+") AND (species.species_code<>0)) " +
                 "GROUP BY species.common_name, species.species_code")
         wghtList=[]
         while query.next():
             spcList.append(query.value(0).toString())
-            query1=QtSql.QSqlQuery("SELECT sum(BASKETS.WEIGHT ) FROM BASKETS, SAMPLES  WHERE " +
+            query1=QtSql.QSqlQuery("SELECT sum(BASKETS.WEIGHT ) FROM " + self.schema + ".BASKETS, "
+                                   + self.schema + ".SAMPLES  WHERE " +
                     "(( SAMPLES.SAMPLE_ID = BASKETS.SAMPLE_ID ) and (SAMPLES.SPECIES_CODE = "+
                     query.value(1).toString()+") AND  (SAMPLES.SURVEY = "+self.survey+
                     ") AND  (SAMPLES.event_id in("+hauls+")))" )
@@ -277,7 +278,7 @@ class AddCatchSpcDlg(QDialog, ui_AddCatchSpcDlg_alt2.Ui_addcatchspcDlg):
 
     def getMethotSpecies(self):
         spcList=[]
-        query=QtSql.QSqlQuery("SELECT species.common_name FROM species WHERE plankton_species=1 ORDER BY species.common_name");
+        query=QtSql.QSqlQuery("SELECT species.common_name FROM " + self.schema + ".species WHERE plankton_species=1 ORDER BY species.common_name");
         while query.next():
             spcList.append(query.value(0).toString())
         self.planktonList.addItems(QStringList(spcList))

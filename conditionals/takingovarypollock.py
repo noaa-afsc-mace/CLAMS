@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class TakingOvaryPollock(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -71,7 +71,9 @@ class TakingOvaryPollock(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -90,11 +92,11 @@ class TakingOvaryPollock(QObject):
             if str(values[measurements.index('sex')]).lower()=='male':
                 #  for males we don't take ovaries, their weights, or livers
                 if 'ovary_taken' in measurements:
-                    result[measurements.index('ovary_taken')]=False
+                    result[measurements.index('ovary_taken')]=[False]
                 if 'liver_weight' in measurements:
-                    result[measurements.index('liver_weight')]=False
+                    result[measurements.index('liver_weight')]=[False]
                 if 'gonad_weight' in measurements:
-                    result[measurements.index('gonad_weight')]=False
+                    result[measurements.index('gonad_weight')]=[False]
             
             
             #  DISABLE THIS CODE FOR WINTER 2013 - We want the option to weigh ovaries even
@@ -116,7 +118,9 @@ This class will need to be customized a bit for each individual validation.
 '''
 class conditionalTest(unittest.TestCase):
     db = None
-    takingOvaryPollock = TakingOvaryPollock(db)
+    schema = None
+    speciesCode = None
+    takingOvaryPollock = TakingOvaryPollock(db, schema, speciesCode)
 
     measurements = ['sex', 'ovary_taken', 'liver_weight', 'gonad_weight']
 
@@ -125,7 +129,7 @@ class conditionalTest(unittest.TestCase):
         results = [1, 2, 3, 4]
 
         ok = self.takingOvaryPollock.evaluate(self.measurements, values, results)
-        self.assertEqual([1, False, False, False], ok)
+        self.assertEqual([1, [False], [False], [False]], ok)
 
     def testFemale(self):
         values = ['female']

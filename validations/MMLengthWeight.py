@@ -19,7 +19,7 @@
     :synopsis: MMLengthWeight checks that the measured weight falls within
                the expected range given the previously recorded length (in mm)
                using the length weight regression for the specified
-               species+subcategory
+               species
 
 | Developed by:  Rick Towler   <rick.towler@noaa.gov>
 |                Kresimir Williams   <kresimir.williams@noaa.gov>
@@ -41,7 +41,7 @@ from PyQt6.QtCore import *
 
 class MMLengthWeight(QObject):
 
-    def __init__(self, db, schema, speciesCode,  subcategory='None'):
+    def __init__(self, db, schema, speciesCode):
         '''
             The init methods of CLAMS validations are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -49,7 +49,6 @@ class MMLengthWeight(QObject):
 
                 db - a reference to the active dbConnection class object
                 speciesCode - the species code of the current specimen
-                subcategory - the subcategory of the current specimen
 
             If you need to pass additional data to a validation, you should
             add this data to the species_data table and query it out here in
@@ -60,12 +59,12 @@ class MMLengthWeight(QObject):
         #  call the superclass init
         QObject.__init__(self, None)
 
-        #  get the length to weight regression parameters for this species+subcat from
+        #  get the length to weight regression parameters for this species from
         #  the species_data table
 
         #  Get the valid length weight parameters for this species from the species table
         sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+speciesCode+
-             " AND subcategory='"+subcategory+"' AND lower(species_parameter)='a_param'")
+             " AND lower(species_parameter)='a_param'")
         query = db.dbQuery(sql)
         aParam, = query.first()
         if aParam:
@@ -76,7 +75,7 @@ class MMLengthWeight(QObject):
             self.aParm = None
 
         sql=("SELECT parameter_value FROM " + schema + ".species_data WHERE species_code="+speciesCode+
-             " AND subcategory='"+subcategory+"' AND lower(species_parameter)='b_param'")
+             " AND lower(species_parameter)='b_param'")
         query = db.dbQuery(sql)
         bParam, = query.first()
         if bParam:
@@ -113,7 +112,7 @@ class MMLengthWeight(QObject):
 
             This validation checks that a measured weight falls within the
             expected range given a previously measured length and the length
-            weight regression for the species+subcat. For this validation
+            weight regression for the species. For this validation
             to work, the length measurement must come before the weight
             measurement in the protocol.
 
@@ -126,7 +125,7 @@ class MMLengthWeight(QObject):
         '''
         #  check if we don't have any regression params
         if self.aParm is None and self.bParm is None and self.tolerance is None:
-            #  there are no lw regression parameters for this species+subcat so bail
+            #  there are no lw regression parameters for this species so bail
             result = (True, '')
             return result
 
@@ -137,19 +136,19 @@ class MMLengthWeight(QObject):
             aParam = float(self.aParm)
         except:
             result = (False, "LengthWeight Validation Error. Non-numeric 'a_param' for " +
-                    "this species+subcateory. The validation cannot run.")
+                    "this species. The validation cannot run.")
             return result
         try:
             bParam = float(self.bParm)
         except:
             result = (False, "LengthWeight Validation Error. Non-numeric 'b_param' for " +
-                    "this species+subcateory. The validation cannot run.")
+                    "this species. The validation cannot run.")
             return result
         try:
             lwTolerance = float(self.tolerance)
         except:
             result = (False, "LengthWeight Validation Error. Non-numeric 'lw_tolerance' for " +
-                    "this species+subcateory. The validation cannot run.")
+                    "this species. The validation cannot run.")
             return result
 
         try:
@@ -180,7 +179,7 @@ class MMLengthWeight(QObject):
             return result
 
         #  calculate the theoretical weight based on the length and LW regression
-        calcWt = (length ** aParam) * bParam
+        calcWt = (length ** bParam) * aParam
 
         #  compute the allowable deviation
         errorDev = (weight / calcWt - 1) * 100
@@ -227,7 +226,6 @@ class validationTest(QObject):
 
             #  set up the required parameters for this test
             speciesCode = '21740'
-            subcategory = 'None'
             currentValue = '.0000055'
             measureTypes = ['standard_length_mm']
             values = [1]
@@ -243,8 +241,7 @@ class validationTest(QObject):
                 db = conenctionDialog.db
 
                 #  create the validation using the db connection and specified species
-                #  and subcategory.
-                self.validation = MMLengthWeight(db, speciesCode, subcategory)
+                self.validation = MMLengthWeight(db, speciesCode)
 
                 #  execute the validation
                 ok = self.validation.validate(currentValue, measureTypes, values)

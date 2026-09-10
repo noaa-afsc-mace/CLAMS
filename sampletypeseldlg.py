@@ -37,6 +37,7 @@
 """
 
 from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
 from ui import ui_SampleTypeSelDlg
 
 
@@ -45,12 +46,26 @@ class sampletypeseldlg(QDialog, ui_SampleTypeSelDlg.Ui_SampleTypeSelDlg):
         super(sampletypeseldlg, self).__init__(parent)
         self.setupUi(self)
 
+        self.db = parent.db
+        self.activeHaul = parent.activeHaul
+        self.schema = parent.schema
+
+        sql = (f"SELECT count(*) from {self.schema}.samples where sample_type='WholeHaul' " 
+               f"and event_id={self.activeHaul}")
+        results = self.db.dbQuery(sql)
+        count, = results.first()
+
+        if (int(count) > 0):
+            self.noExtrapBtn.setEnabled(True)
+        else:
+            self.noExtrapBtn.setEnabled(False)
+        
         # variable declarations
         self.result = (False, '')
 
         self.speciesBtn.clicked.connect(self.getType)
         self.presentBtn.clicked.connect(self.getType)
-
+        self.noExtrapBtn.clicked.connect(self.getType)
 
     def getType(self):
         """

@@ -444,7 +444,7 @@ class CLAMSsbeDownloader(QMainWindow, ui_CLAMSsbeDownloader.Ui_sbeDownloader):
             self.serialNumber = status['serial number']
 
             # get clamsbase device id for this sbe
-            query = self.db.dbQuery("SELECT device_id FROM devices WHERE model like 'SBE39%' AND serial_number='" +
+            query = self.db.dbQuery("SELECT device_id FROM" + self.schema + ". devices WHERE model like 'SBE39%' AND serial_number='" +
                     self.serialNumber + "'")
             self.device_id, = query.first()
 

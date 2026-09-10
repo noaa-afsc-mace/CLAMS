@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260\CLAMS\ui\SpeciesList.ui'
+# Form implementation generated from reading ui file 'SpeciesList.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -58,3 +58,13 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(_translate("Dialog", "Species List"))
         self.pushButton_2.setText(_translate("Dialog", "Cancel"))
         self.pushButton.setText(_translate("Dialog", "Add To List"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    Dialog = QtWidgets.QDialog()
+    ui = Ui_Dialog()
+    ui.setupUi(Dialog)
+    Dialog.show()
+    sys.exit(app.exec())

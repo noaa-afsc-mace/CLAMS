@@ -289,7 +289,7 @@ class dbConnection:
         
     def createTime(self, time):
         if (self.isPostgres):
-            return QDateTime().fromString(time, 'YYYY-MM-DD hh:mm:ss.zzz')
+            return QDateTime().fromString(time, 'yyyy-MM-dd hh:mm:ss.zzz')
         else:
             return QDateTime().fromString(time, 'MMddyyyy hh:mm:ss.zzz')
     

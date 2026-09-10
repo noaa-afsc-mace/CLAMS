@@ -40,7 +40,7 @@ from PyQt6.QtCore import *
 
 class BodyOrHeadSalmon(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -71,7 +71,9 @@ class BodyOrHeadSalmon(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -91,18 +93,18 @@ class BodyOrHeadSalmon(QObject):
 		
         if self.cnt < 21:
             try:
-                result[measurements.index('fish_head')] = False
+                result[measurements.index('fish_head')] = [False]
             except:
                 pass
         elif self.cnt > 20 & self.cnt < 51:
             try:
-                result[measurements.index('whole_fish')] = False
+                result[measurements.index('whole_fish')] = [False]
             except:
                 pass
         elif self.cnt > 51:
             try:
-                result[measurements.index('whole_fish')] = False
-                result[measurements.index('fish_head')] = False
+                result[measurements.index('whole_fish')] = [False]
+                result[measurements.index('fish_head')] = [False]
             except:
                 pass
                 
@@ -142,10 +144,12 @@ class conditionalTest(QObject):
             values = [1, None, None]
             results = [3, 4]
             db = None
+            schema = None
+            speciesCode = None
             ok = None
 
             #  create the validation using an empty db connection
-            self.evaluate = BodyOrHeadSalmon(db)
+            self.evaluate = BodyOrHeadSalmon(db, schema, speciesCode)
 
             #  execute the validation 11 times
             for x in range(30):

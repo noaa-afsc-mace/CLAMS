@@ -42,7 +42,7 @@ from PyQt6.QtCore import *
 
 class NoOvaryWhenMale(QObject):
 
-    def __init__(self, db):
+    def __init__(self, db, schema, speciesCode, parent=None):
         '''
             The init methods of CLAMS conditionals are run whenever a new protocol
             or species is selected in the specimen module. Any setup that the
@@ -72,7 +72,9 @@ class NoOvaryWhenMale(QObject):
                     protocol, in order.
                 values - a list of the stored values of those measurements.
                     In order of the measurements.
-                result -
+                result - a 2-d array (e.g. [[True, False], [False, True], ...]), the
+                    first item represents whether a measurement is enabled (True) or disabled (False) and
+                    the second item represents whether a measurement is mandatory (True) or optional (False)
 
             For example, this conditional is for the body count measurement and when
             a count value is logged, it will check to see if that value is greater than 50.
@@ -90,9 +92,9 @@ class NoOvaryWhenMale(QObject):
             sex=str(values[measurements.index('sex')])
             if (sex.lower() != 'female'):
                 try:
-                    result[measurements.index('ovary_taken')]=False
-                    result[measurements.index('gonad_weight')]=False
-                    result[measurements.index('liver_weight')]=False
+                    result[measurements.index('ovary_taken')]=[False]
+                    result[measurements.index('gonad_weight')]=[False]
+                    result[measurements.index('liver_weight')]=[False]
                 except:
                     pass
 
@@ -107,7 +109,9 @@ This class will need to be customized a bit for each individual validation.
 '''
 class conditionalTest(unittest.TestCase):
     db = None
-    noOvaryWhenMale = NoOvaryWhenMale(db)
+    schema = None
+    speciesCode = None
+    noOvaryWhenMale = NoOvaryWhenMale(db, schema, speciesCode)
 
     measurements = ['sex', 'ovary_taken', 'liver_weight', 'gonad_weight']
 
@@ -116,7 +120,7 @@ class conditionalTest(unittest.TestCase):
         results = [1, 2, 3, 4]
 
         ok = self.noOvaryWhenMale.evaluate(self.measurements, values, results)
-        self.assertEqual([1, False, False, False], ok)
+        self.assertEqual([1, [False], [False], [False]], ok)
 
     def testFemale(self):
         values = ['female']

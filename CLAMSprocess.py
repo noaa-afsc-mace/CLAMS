@@ -88,6 +88,11 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.black = QPalette()
         self.black.setColor(QPalette.ColorRole.ButtonText,QColor(0, 0, 0))
 
+        # hide fix species and edit codend button for SWFSC mode
+        if self.settings['OrganizationName'] == 'SWFSC':
+            self.fixSpeciesBtn.hide()
+            self.editCodendStateBtn.hide()
+
         # set up button colors
         self.haulBtn.setPalette(self.black)
         self.catchBtn.setPalette(self.black)
@@ -121,6 +126,13 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         #  set the event number
         self.haulLabel.setText(self.activeHaul)
 
+        # added by AB to account for different length types
+        # get all lengths from measurement_types
+        self.length_types = []
+        sql_l = f"SELECT measurement_type from {self.schema}.MEASUREMENT_TYPES WHERE is_length=1"
+        query_l = self.db.dbQuery(sql_l)
+        for lt, in query_l:
+            self.length_types.append(lt)
 
         # get the scientist - first get the list of active scientists
         self.sciList=[]
@@ -260,21 +272,19 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.activePartition = self.partitionBox.currentText()
 
         #  check if the codend status has been set
-        sql = ("SELECT * FROM " + self.schema + ".event_data WHERE ship = " + self.ship +
-                " AND survey = " + self.survey + " and event_id = " +
-                self.activeHaul+ " AND partition = '"+ self.activePartition +
-                "' AND event_parameter = 'CodendStatus'")
+        sql = (f"SELECT * FROM {self.schema}.event_data WHERE ship={self.ship} AND survey={self.survey} "
+               f"AND event_id={self.activeHaul} AND partition='{self.activePartition}' "
+               f"AND event_parameter = 'CodendStatus'")
         query = self.db.dbQuery(sql)
-        if not query.first():
+        first_row = query.first()
+        if not first_row or all(item is None for item in first_row):
             # value has not been recorded for this partition - display the status dialog
             self.codendstate.exec()
             codendstatus = self.codendstate.state_value
             #  and insert the status into event_data
-            sql = ("INSERT INTO event_data (ship, survey, event_id, partition, " +
-                    "event_parameter, parameter_value) VALUES(" + self.ship +
-                    "," + self.survey + "," + self.activeHaul + ",'" +
-                    self.activePartition + "' ,'CodendStatus','" +
-                    codendstatus + "')")
+            sql = (f"INSERT INTO {self.schema}.event_data (ship, survey, event_id, partition, "
+                   f"event_parameter, parameter_value) VALUES({self.ship}, {self.survey}, {self.activeHaul}, "
+                   f"'{self.activePartition}' ,'CodendStatus','{codendstatus}')")
             self.db.dbExec(sql)
 
 
@@ -321,10 +331,12 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
 
             #  only set up network and serial devices
             if self.deviceData[deviceName]['interface'] in ['network', 'serial']:
-                #  then add this device to the sensor monitor
-                self.sensorMonitor.addDevice(deviceName, deviceParams['port'], deviceParams['baud'],
-                        deviceParams['parseType'], deviceParams['parseExp'], deviceParams['parseIndex'],
-                        deviceParams['commandPrompt'])
+                # added 6/9/26 - remove network printer from monitor since it is throwing an error
+                if self.deviceData[deviceName]['interface'] != 'network' and deviceName != 'Label_Printer':
+                    #  then add this device to the sensor monitor
+                    self.sensorMonitor.addDevice(deviceName, deviceParams['port'], deviceParams['baud'],
+                            deviceParams['parseType'], deviceParams['parseExp'], deviceParams['parseIndex'],
+                            deviceParams['commandPrompt'])
 
             #  store the sound effect object for each device with an associated sound
             if 'soundFile' in deviceParams['soundFile']:
@@ -365,7 +377,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
     def editCodendState(self):
 
         #  make sure there is an active partition
-        if (self.activePartition == None):
+        if self.activePartition is None:
             #  no partition selected - issue error
             self.message.setMessage(self.errorIcons[1], self.errorSounds[1], "Sorry " +
                     self.firstName + ", you need to select a partition for" +
@@ -374,10 +386,9 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             return
 
         #  get the existing codend status
-        sql = ("SELECT parameter_value FROM " + self.schema + ".event_data WHERE ship = " + self.ship +
-                " and survey = " + self.survey + " and event_id = " +
-                self.activeHaul + " and partition = '" + self.activePartition +
-                "' AND event_parameter = 'CodendStatus'")
+        sql = (f"SELECT parameter_value FROM {self.schema}.event_data WHERE ship={self.ship} AND survey={self.survey} "
+               f"AND event_id={self.activeHaul} AND partition='{self.activePartition}' "
+               f"AND event_parameter = 'CodendStatus'")
         query = self.db.dbQuery(sql)
         currentCodendState, = query.first()
 
@@ -711,7 +722,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
             self.db.startTransaction()
 
             #  delete existing data for this event
-            sql = ("DELETE FROM catch_summary WHERE ship=" + self.ship + " AND survey=" + self.survey +
+            sql = ("DELETE FROM " + self.schema + ".catch_summary WHERE ship=" + self.ship + " AND survey=" + self.survey +
                     " AND event_id=" + event_id)
             self.db.dbExec(sql)
 
@@ -740,7 +751,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                     sci_name, common_name = sppQuery.first()
 
                     #  then insert results into catch summary table
-                    sql = ("INSERT INTO catch_summary (ship,survey,event_id,partition,sample_id,parent_sample," +
+                    sql = ("INSERT INTO " + self.schema + ".catch_summary (ship,survey,event_id,partition,sample_id,parent_sample," +
                             "scientific_name,species_code,common_name,subcategory,weight_in_haul,sampled_weight," +
                             "number_in_haul,sampled_number,frequency_expansion,in_mix,whole_hauled) VALUES(" +
                             self.ship + "," + self.survey + "," + event_id + ",'" + partition + "'," + sample_id + "," +
@@ -923,7 +934,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
                                     overrideDesc = ("'Bad subsample weight. Total sampled weight=" +
                                             str(round(basketWeight,2)) + " Theoretical weight=" +
                                             str(round(calcWeight,2)) + "'")
-                                    sql = ("INSERT INTO overrides (ship,survey,event_id,record_id,table_name," +
+                                    sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                                             "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                                             "," + self.activeHaul + "," + key + ",'baskets','" +
                                             self.scientist + "'," + overrideDesc + ")")
