@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'CLAMSProcess.ui'
+# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260_Deploy\CLAMS\ui\CLAMSProcess.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_clamsProcess(object):
     def setupUi(self, clamsProcess):
         clamsProcess.setObjectName("clamsProcess")
-        clamsProcess.resize(950, 624)
+        clamsProcess.resize(1195, 636)
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(clamsProcess)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
@@ -154,6 +154,20 @@ class Ui_clamsProcess(object):
         self.line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.line.setObjectName("line")
         self.verticalLayout_4.addWidget(self.line)
+        self.catchView = QtWidgets.QTableView(parent=clamsProcess)
+        self.catchView.setMinimumSize(QtCore.QSize(1173, 395))
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.catchView.setFont(font)
+        self.catchView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.catchView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.catchView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.catchView.setObjectName("catchView")
+        self.catchView.horizontalHeader().setStretchLastSection(False)
+        self.verticalLayout_4.addWidget(self.catchView)
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout_4.addItem(spacerItem)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
@@ -215,13 +229,3 @@ class Ui_clamsProcess(object):
         self.fixSpeciesBtn.setText(_translate("clamsProcess", "Fix Species/Sex Assignment"))
         self.editCodendStateBtn.setText(_translate("clamsProcess", "Edit Codend State"))
         self.doneBtn.setText(_translate("clamsProcess", "Finished processing haul"))
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    clamsProcess = QtWidgets.QDialog()
-    ui = Ui_clamsProcess()
-    ui.setupUi(clamsProcess)
-    clamsProcess.show()
-    sys.exit(app.exec())

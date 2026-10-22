@@ -58,6 +58,9 @@ import FEATZebraPrinter
 import speciesEditDlg
 import measurementDialogs.FEATProjectDlg as project
 
+from measurementDialogs import swfscbarcodenumpad
+from organizationConfig import SWFSC, NWFSC
+from organizationConfig import hasOrganization
 
 class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
@@ -262,8 +265,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         printerId, printerName = query.first()
         if printerId:
             #  initialize the Label Printer
-            if 'nwfsc' in self.settings['OrganizationName'].lower() or \
-                    'swfsc' in self.settings['OrganizationName'].lower():
+            if hasOrganization(self.settings, NWFSC, SWFSC):
                 # get the ip and port
                 printer_sql = ("SELECT device_parameter, parameter_value "
                                "FROM " + self.schema + ".device_configuration WHERE device_id = " + printerId)
@@ -385,7 +387,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.subcategories.append(subcategory)
 
         # set up device sounds
-        #self.loadDeviceSounds()
+        self.loadDeviceSounds()
 
         #  reload the species list - this populates the species list
         self.reloadSamplesList()
@@ -393,7 +395,32 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         self.updateParentKeys()
 
+    def loadDeviceSounds(self):
+        """Loads QSoundEffect objects for all configured devices into self.sounds."""
 
+        # load sounds for all devices
+        sql = (f"SELECT device_id, parameter_value FROM {self.schema}.device_configuration "
+               f"WHERE device_parameter='SoundFile'")
+        query = self.db.dbQuery(sql)
+
+        for dev_id, sound_file in query:
+            if sound_file:
+                # Ensure the path is correct and has a .wav extension
+                if not sound_file.lower().endswith('.wav'):
+                    sound_file += '.wav'
+                sound_path = os.path.join(self.settings['SoundsDir'], sound_file)
+
+                effect = QSoundEffect()
+                effect.setSource(QUrl.fromLocalFile(sound_path))
+                self.sounds[str(dev_id)] = effect
+
+        # load for manual device id
+        source = os.path.join(self.settings['SoundsDir'], 'KARATE.wav')
+        man_effect = QSoundEffect()
+        man_effect.setSource(QUrl.fromLocalFile(source))
+        self.sounds['0'] = man_effect
+
+        
     def getSpecies(self):
         '''getSpecies is called when the Add Species button is pressed and it pauses
         device input and displays the add species dialog.
@@ -840,10 +867,6 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         self.manualFlag = False
         self.activeDeviceId = self.deviceData[device_name]['id']
 
-        #  play the sound associated with this device if provided
-        if self.deviceData[device_name]['soundeffect']:
-            self.deviceData[device_name]['soundeffect'].play()
-
         #  do some basic checks, get the basket type, then insert into the database
         self.updateBasket()
 
@@ -949,6 +972,10 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         # update the GUI
         self.updateTables()
 
+        # play the specific sound for whichever device sent the weight
+        if str(self.activeDeviceId) in self.sounds:
+            self.sounds[str(self.activeDeviceId)].play()
+
         #  we're done with this basket - unfreeze
         self.freeze = False
 
@@ -1011,7 +1038,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.basketTable.setItem(basketCount, 1, QTableWidgetItem(count))
             self.basketTable.setItem(basketCount, 2, QTableWidgetItem(basketType))
 
-            if 'nwfsc' in self.settings['OrganizationName'].lower() and basketType == 'Measure':
+            if hasOrganization(self.settings, NWFSC) and basketType == 'Measure':
                 self.basketTable.item(basketCount, 2).setBackground(QColor(127, 255, 212))
             basketCount += 1
 
@@ -1545,7 +1572,8 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
         #  get the mix species weight
         mixSpeciesWeight = 0
-        sql = ("SELECT SUM(baskets.weight) FROM " + self.schema + ".samples, baskets WHERE samples.sample_id = "+
+        sql = ("SELECT SUM(baskets.weight) FROM " + self.schema + ".samples, " + self.schema +
+               ".baskets WHERE samples.sample_id = "+
                 "baskets.sample_id AND samples.ship=baskets.ship AND " +
                 "samples.survey=baskets.survey AND samples.event_id=baskets.event_id " +
                 "AND samples.ship="+self.ship+" AND samples.survey="+
@@ -1679,7 +1707,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
                 if self.settings['DisplayProtoSp'] == 'True':
                     # check if species is in the protocol_map table as Active
                     proto_sql = ("SELECT protocol_name, species_code FROM " +
-                                 self.schema + ".protocol_map WHERE species_code=" + spCode)
+                                 self.schema + ".protocol_map WHERE species_code=" + spCode + " AND active=1")
                     proto_query = self.db.dbQuery(proto_sql)
                     sp_protos = ['BagNTag']
                     for protocol, sp_code in proto_query:
@@ -1711,8 +1739,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.message.exec()
             return
         else:
-            if 'nwfsc' in self.settings['OrganizationName'].lower() \
-                    or 'swfsc' in self.settings['OrganizationName'].lower():
+            if hasOrganization(self.settings, NWFSC, SWFSC):
                 # get the project to apply the sample to for the species
                 selected_project = project.FEATProjectDlg(self)
                 if selected_project.result() == 1:

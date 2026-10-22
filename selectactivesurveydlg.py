@@ -145,21 +145,21 @@ class SelectActiveSurveyDlg(QDialog, ui_SelectActiveSurveyDlg.Ui_selectactivesur
 
                 #  reset the sequences for the new ship/survey combo. This sets the sequence values
                 #  to whatever is appropriate for this ship/survey.
-                sql = ("CALL reset_sequence_by_survey('baskets', 'basket_id'," +
-                        self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('" + self.schema + ".baskets'::text, 'basket_id'::text," +
+                        self.shipNumber + "::bigint," + self.surveyData[selectedIndex] + "::bigint)")
                 self.db.dbExec(sql)
 
-                sql = ("CALL reset_sequence_by_survey('samples', 'sample_id'," +
-                        self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('" + self.schema + ".samples'::text, 'sample_id'::text," +
+                        self.shipNumber + "::bigint," + self.surveyData[selectedIndex] + "::bigint)")
                 self.db.dbExec(sql)
 
-                sql = ("CALL reset_sequence_by_survey('specimen', 'specimen_id'," +
-                        self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('" + self.schema + ".specimen'::text, 'specimen_id'::text," +
+                        self.shipNumber + "::bigint," + self.surveyData[selectedIndex] + "::bigint)")
                 self.db.dbExec(sql)
 
                 #  reset the protected spp event ID sequence - new in 2019
-                sql = ("CALL reset_sequence_by_survey('protected_spp_events', 'event_id'," +
-                        self.shipNumber + "," + self.surveyData[selectedIndex] + ")")
+                sql = ("CALL " + self.schema + ".reset_sequence_by_survey('" + self.schema + ".protected_spp_events'::text, 'event_id'::text," +
+                        self.shipNumber + "::bigint," + self.surveyData[selectedIndex] + "::bigint)")
                 self.db.dbExec(sql)
 
                 self.db.commit()

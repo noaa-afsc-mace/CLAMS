@@ -231,7 +231,7 @@ class CLAMSLength(QDialog, ui_CLAMSLength.Ui_clamsLength):
         # populate species window with species that have been measured in by the catch form
         # first gather all the species information for the current haul and partition
         sql = ("SELECT species.common_name, species.scientific_name, samples.species_code, samples.sample_id, samples.subcategory"+
-                    " FROM " + self.schema + ".species, samples, baskets"+
+                    " FROM " + self.schema + ".species, " + self.schema + ".samples, " + self.schema + ".baskets"+
                 " WHERE species.species_code = samples.species_code AND samples.ship=baskets.ship"+
                 " AND samples.survey=baskets.survey AND samples.event_id=baskets.event_id"+
                 " AND samples.sample_id=baskets.sample_id AND samples.ship="+self.ship+" AND samples.survey="+
