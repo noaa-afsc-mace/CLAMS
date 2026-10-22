@@ -360,11 +360,8 @@ class CLAMSSpecimen(QDialog, ui_CPSCLAMSSpecimen.Ui_cpsclamsSpecimen):
         self.measureView.setEnabled(enabled)
         self.plotsView.setEnabled(enabled)
         self.plotsView.show()
-        
-        if 'nwfsc' in self.settings['OrganizationName'].lower() or \
-                'swfsc' in self.settings['OrganizationName'].lower():
-            self.collectBtn.hide()
-            self.printBtn.setText('Print Label')
+        self.collectBtn.hide()
+        self.printBtn.setText('Print Label')
 
 
     def serialIOFilter(self):

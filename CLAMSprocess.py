@@ -44,6 +44,8 @@ from PyQt6.QtWidgets import *
 from PyQt6 import QtSql  
 from PyQt6.QtMultimedia import QSoundEffect
 import Clamsbase2Functions
+from organizationConfig import SWFSC
+from organizationConfig import hasOrganization
 from ui import ui_CLAMSProcess
 import devices
 import CLAMShaul
@@ -82,6 +84,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.methotFlag=False
         self.sensorsClosed = False
         self.sensorsStopping = False
+        self.showSummaryTable = hasOrganization(self.settings, SWFSC)
 
         #  set up some colors
         self.blue = QPalette()
@@ -90,7 +93,7 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.black.setColor(QPalette.ColorRole.ButtonText,QColor(0, 0, 0))
 
         # hide fix species and edit codend button for SWFSC mode
-        if self.settings['OrganizationName'] == 'SWFSC':
+        if hasOrganization(self.settings, SWFSC):
             self.fixSpeciesBtn.hide()
             self.editCodendStateBtn.hide()
 
@@ -113,13 +116,14 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         self.doneBtn.clicked.connect(self.close)
 
         # SETUP THE TABLE VIEW ---
-        self.catchModel = QtSql.QSqlQueryModel()
-        self.catchView.setModel(self.catchModel)
-        self.catchView.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.catchView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.catchView.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.catchView.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)        # -----------------------------------------------
-        self.catchView.horizontalHeader().setStyleSheet("QHeaderView::section { font-size: 12pt; font-weight: bold; }")
+        if self.showSummaryTable:
+            self.catchModel = QtSql.QSqlQueryModel()
+            self.catchView.setModel(self.catchModel)
+            self.catchView.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            self.catchView.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.catchView.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self.catchView.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)        # -----------------------------------------------
+            self.catchView.horizontalHeader().setStyleSheet("QHeaderView::section { font-size: 12pt; font-weight: bold; }")
 
         #  restore the application state
         self.appSettings = QSettings('CLAMS', 'ProcessForm')
@@ -490,38 +494,39 @@ class CLAMSProcess(QDialog, ui_CLAMSProcess.Ui_clamsProcess):
         updateCatchView queries all columns from v_catch_view for the current 
         event and updates the catchView QTableView on the GUI.
         '''
-        # Ensure the database is open
-        if not self.db.db.isOpen():
-            self.db.dbOpen()
+        if self.showSummaryTable:
+            # Ensure the database is open
+            if not self.db.db.isOpen():
+                self.db.dbOpen()
 
-        # UPDATED: Match the column names exactly as they appear in v_catch_view (cruise, haul)
-        # Note: I added single quotes around {self.ship} assuming it is a string like 'RL'. 
-        # If self.ship is actually a numeric ID in Python, you may need to remove the ship filter here.
-        sql = (f"SELECT * FROM {self.schema}.v_catch_view "
-               f"WHERE cruise = {self.survey} "
-               f"AND haul = {self.activeHaul}")
-        
-        # Execute the query and bind it to the model
-        self.catchModel.setQuery(sql, self.db.db)
-        
-        # --- HIDE SPECIFIC COLUMNS ---
-        # Loop through all the columns in the model
-        for col in range(self.catchModel.columnCount()):
-            # Get the name of the column
-            col_name = self.catchModel.headerData(col, Qt.Orientation.Horizontal)
+            # UPDATED: Match the column names exactly as they appear in v_catch_view (cruise, haul)
+            # Note: I added single quotes around {self.ship} assuming it is a string like 'RL'. 
+            # If self.ship is actually a numeric ID in Python, you may need to remove the ship filter here.
+            sql = (f"SELECT * FROM {self.schema}.v_catch_view "
+                f"WHERE cruise = {self.survey} "
+                f"AND haul = {self.activeHaul}")
             
-            # If the column name is in our list of columns to hide, hide it!
-            if col_name in ['cruise', 'ship', 'haul']:
-                self.catchView.setColumnHidden(col, True)
+            # Execute the query and bind it to the model
+            self.catchModel.setQuery(sql, self.db.db)
+            
+            # --- HIDE SPECIFIC COLUMNS ---
+            # Loop through all the columns in the model
+            for col in range(self.catchModel.columnCount()):
+                # Get the name of the column
+                col_name = self.catchModel.headerData(col, Qt.Orientation.Horizontal)
+                
+                # If the column name is in our list of columns to hide, hide it!
+                if col_name in ['cruise', 'ship', 'haul']:
+                    self.catchView.setColumnHidden(col, True)
 
-        # DEBUGGING: If the table is still empty, this will print the exact SQL error to your terminal
-        if self.catchModel.lastError().isValid():
-            print("SQL Error in catchView:", self.catchModel.lastError().text())
-            print("Attempted Query:", sql)
-        
-        # Resize columns to fit contents and scroll to the latest entry
-        self.catchView.resizeColumnsToContents()
-        self.catchView.scrollToBottom()
+            # DEBUGGING: If the table is still empty, this will print the exact SQL error to your terminal
+            if self.catchModel.lastError().isValid():
+                print("SQL Error in catchView:", self.catchModel.lastError().text())
+                print("Attempted Query:", sql)
+            
+            # Resize columns to fit contents and scroll to the latest entry
+            self.catchView.resizeColumnsToContents()
+            self.catchView.scrollToBottom()
     # --------------------------------
     def getLength(self):
         '''getLength opens up the Length form.

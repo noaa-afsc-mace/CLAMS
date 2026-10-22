@@ -58,6 +58,9 @@ import FEATZebraPrinter
 import speciesEditDlg
 import measurementDialogs.FEATProjectDlg as project
 
+from measurementDialogs import swfscbarcodenumpad
+from organizationConfig import SWFSC, NWFSC
+from organizationConfig import hasOrganization
 
 class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
 
@@ -262,8 +265,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
         printerId, printerName = query.first()
         if printerId:
             #  initialize the Label Printer
-            if 'nwfsc' in self.settings['OrganizationName'].lower() or \
-                    'swfsc' in self.settings['OrganizationName'].lower():
+            if hasOrganization(self.settings, NWFSC, SWFSC):
                 # get the ip and port
                 printer_sql = ("SELECT device_parameter, parameter_value "
                                "FROM " + self.schema + ".device_configuration WHERE device_id = " + printerId)
@@ -1036,7 +1038,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.basketTable.setItem(basketCount, 1, QTableWidgetItem(count))
             self.basketTable.setItem(basketCount, 2, QTableWidgetItem(basketType))
 
-            if 'nwfsc' in self.settings['OrganizationName'].lower() and basketType == 'Measure':
+            if hasOrganization(self.settings, NWFSC) and basketType == 'Measure':
                 self.basketTable.item(basketCount, 2).setBackground(QColor(127, 255, 212))
             basketCount += 1
 
@@ -1737,8 +1739,7 @@ class CLAMSCatch(QDialog, ui_CLAMSCatch.Ui_clamsCatch):
             self.message.exec()
             return
         else:
-            if 'nwfsc' in self.settings['OrganizationName'].lower() \
-                    or 'swfsc' in self.settings['OrganizationName'].lower():
+            if hasOrganization(self.settings, NWFSC, SWFSC):
                 # get the project to apply the sample to for the species
                 selected_project = project.FEATProjectDlg(self)
                 if selected_project.result() == 1:
