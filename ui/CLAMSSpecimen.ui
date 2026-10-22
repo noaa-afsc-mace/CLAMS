@@ -729,6 +729,25 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="collectBtn">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>50</height>
+        </size>
+       </property>
+       <property name="font">
+        <font>
+         <family>Arial Black</family>
+         <pointsize>14</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Collect</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="plotsView">
        <property name="minimumSize">
         <size>

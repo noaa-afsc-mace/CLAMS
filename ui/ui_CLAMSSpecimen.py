@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'C:\CLAMS_WPy64-31260_Deploy\CLAMS\ui\CLAMSSpecimen.ui'
+# Form implementation generated from reading ui file 'CLAMSSpecimen.ui'
 #
 # Created by: PyQt6 UI code generator 6.8.0
 #
@@ -391,6 +391,14 @@ class Ui_clamsSpecimen(object):
         self.commentBtn.setFont(font)
         self.commentBtn.setObjectName("commentBtn")
         self.horizontalLayout.addWidget(self.commentBtn)
+        self.collectBtn = QtWidgets.QPushButton(parent=clamsSpecimen)
+        self.collectBtn.setMinimumSize(QtCore.QSize(0, 50))
+        font = QtGui.QFont()
+        font.setFamily("Arial Black")
+        font.setPointSize(14)
+        self.collectBtn.setFont(font)
+        self.collectBtn.setObjectName("collectBtn")
+        self.horizontalLayout.addWidget(self.collectBtn)
         self.plotsView = QtWidgets.QPushButton(parent=clamsSpecimen)
         self.plotsView.setMinimumSize(QtCore.QSize(0, 50))
         font = QtGui.QFont()
@@ -438,6 +446,17 @@ class Ui_clamsSpecimen(object):
         self.protoBtn.setText(_translate("clamsSpecimen", "Protocol"))
         self.deleteBtn.setText(_translate("clamsSpecimen", "Delete"))
         self.commentBtn.setText(_translate("clamsSpecimen", "Comment"))
+        self.collectBtn.setText(_translate("clamsSpecimen", "Collect"))
         self.plotsView.setText(_translate("clamsSpecimen", "Show Plots"))
         self.printBtn.setText(_translate("clamsSpecimen", "Print"))
         self.doneBtn.setText(_translate("clamsSpecimen", "Done"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    clamsSpecimen = QtWidgets.QDialog()
+    ui = Ui_clamsSpecimen()
+    ui.setupUi(clamsSpecimen)
+    clamsSpecimen.show()
+    sys.exit(app.exec())

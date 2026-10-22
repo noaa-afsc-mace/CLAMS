@@ -408,7 +408,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.addspcBtn.clicked.connect(self.getSpecies)
         self.cycleBtn.clicked.connect(self.getNext)
         self.deleteBtn.clicked.connect(self.goDelete)
-        #self.collectBtn.clicked.connect(self.getCollections)
+        self.collectBtn.clicked.connect(self.getCollections)
         self.doneBtn.clicked.connect(self.close)
         self.protoBtn.clicked.connect(self.getProtocol)
         self.selModel.selectionChanged.connect(self.getEditSel)
@@ -462,16 +462,21 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.protoBtn.setEnabled(enabled)
         self.deleteBtn.setEnabled(enabled)
         self.commentBtn.setEnabled(enabled)
-        #self.collectBtn.setEnabled(enabled)
+        self.collectBtn.setEnabled(enabled)
         self.printBtn.setEnabled(enabled)
         self.measureView.setEnabled(enabled)
-        self.plotsView.setEnabled(enabled)
-        self.plotsView.show()
+        self.plotsView.hide()
         
-        if 'nwfsc' in self.settings['OrganizationName'].lower() or \
-                'swfsc' in self.settings['OrganizationName'].lower():
-            #self.collectBtn.hide()
+        if 'nwfsc' in self.settings['OrganizationName'].lower():
+            self.collectBtn.hide()
             self.printBtn.setText('Print Label')
+            self.plotsView.setEnabled(enabled)
+            self.plotsView.show()
+        elif 'swfsc' in self.settings['OrganizationName'].lower():
+            self.collectBtn.hide()
+            self.printBtn.setText('Print Label')
+            self.plotsView.setEnabled(enabled)
+            self.plotsView.show()
 
 
     def serialIOFilter(self):
