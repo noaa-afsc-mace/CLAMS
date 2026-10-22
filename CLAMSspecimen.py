@@ -55,13 +55,202 @@ import messagedlg
 import collectionsdlg
 import ZebraLabelPrinter
 import FEATZebraPrinter
+import deletedlg
+import pyqtgraph as pg 
+import math
 
+from ui import ui_CPSSpecPlots
 
+class SpecPlotsDialog(QDialog, ui_CPSSpecPlots.Ui_Dialog):
+    '''Dialog class for CPSSpecPlots.ui'''
+    def __init__(self, parent=None):
+        super(SpecPlotsDialog, self).__init__(parent)
+        self.setupUi(self)
+        # Style the plots (optional, but looks nice!)
+        self.LWPlot.setBackground('w') # white background
+        self.LWPlot.setTitle("Length vs. Weight - Current Haul", color="b", size="12pt")
+        self.LWPlot.setLabel('left', 'Weight (g)', color='black')
+        self.LWPlot.setLabel('bottom', 'Length (mm)', color='black')
+        self.LWPlot.showGrid(x=True, y=True)
+
+        self.OtoLengthPlot.setBackground('w')
+        self.OtoLengthPlot.setTitle("Otolith vs. Lengths Taken - Whole Survey", color="b", size="12pt")
+        self.OtoLengthPlot.setLabel('left', 'Count', color='black')
+        self.OtoLengthPlot.setLabel('bottom', 'Length (mm)', color='black')
+        self.OtoLengthPlot.showGrid(x=True, y=True)
+        
+        # Call the method to draw the data
+        self.plot_data()
+
+    def showPlots(self):
+        # Pass `self` so the dialog can access the database or variables from the main window!
+        plots_dialog = SpecPlotsDialog(parent=self)
+        plots_dialog.exec()
+
+    def plot_data(self):
+        '''Extracts data from the database and plots it on the graph widgets.'''
+        
+        # 1. Grab the active species info
+        species_name = self.parent().activeSpcName.lower()
+        species_code = str(self.parent().activeSpcCode)
+        
+        # 2. Determine the correct length column and bin sizes based on the species
+        if "anchovy" in species_name or "sardine" in species_name or species_code in ['161828', '161729']:
+            length_col = "standard_length_mm"
+            x_label = "Standard Length (mm)"
+            bin_step = 10
+            bins = list(range(10, 330, bin_step)) # 10 to 320
+        elif "mackerel" in species_name or species_code in ['172412', '168586', '164792', '161746', '551209','161702','162053','162028','162030','162035','162049','166012','162051',
+                                                            '161983','161975','161976','161977','161979','161980','161989','161974'
+                                                            ]:
+            length_col = "fork_length_mm"
+            x_label = "Fork Length (mm)"
+            bin_step = 25
+            bins = list(range(0, 625, bin_step)) # 0 to 600
+        else:
+            length_col = "length" 
+            x_label = "Length (mm)"
+            bin_step = 10
+            bins = list(range(0, 1000, bin_step))
+
+        # Update the X-axis labels
+        self.LWPlot.setLabel('bottom', x_label, color='black')
+        self.OtoLengthPlot.setLabel('bottom', x_label, color='black')
+
+        # ==========================================
+        # PLOT 1: LENGTH VS WEIGHT (Current Haul)
+        # ==========================================
+        sql_lw = (f"SELECT {length_col}, weight_g FROM {self.parent().schema}.v_specimen_measurements "
+                  f"WHERE ship = {self.parent().ship} AND survey = {self.parent().survey} "
+                  f"AND event_id = {self.parent().activeHaul} " # Only current haul
+                  f"AND species_code = {self.parent().activeSpcCode} "
+                  f"AND {length_col} IS NOT NULL AND weight_g IS NOT NULL")
+        
+        query_lw = self.parent().db.dbQuery(sql_lw)
+        
+        lengths = []
+        weights = []
+        for length, weight in query_lw:
+            lengths.append(float(length))
+            weights.append(float(weight))
+            
+        self.LWPlot.clear() 
+        if lengths and weights:
+            self.LWPlot.plot(lengths, weights, pen=None, symbol='o', symbolSize=8, symbolBrush='k')
+
+# --- Theoretical Length-Weight Curve ---
+            lw_params = {
+                "sardine": {"intercept": -12.31667, "slope": 3.198896},
+                "anchovy": {"intercept": -12.03663, "slope": 3.114000},
+                "pacific mackerel": {"intercept": -13.01634, "slope": 3.299816},
+                "jack mackerel": {"intercept": -11.42293, "slope": 3.010456},
+                "pacific herring": {"intercept": -12.72208, "slope": 3.235567},
+                "hake": {"intercept": -12.39755, "slope": 3.078660}
+            }
+
+            # Figure out if our active species is in the reference dictionary
+            matched_key = None
+            for key in lw_params:
+                if key in species_name:
+                    matched_key = key
+                    break
+            
+            # If we have a match, draw the theoretical curve!
+            if matched_key:
+                intercept = lw_params[matched_key]["intercept"]
+                slope = lw_params[matched_key]["slope"]
+                
+                # Create a smooth X array from the minimum to maximum lengths in our scatter plot
+                min_l = max(1.0, min(lengths)) # Avoid log(0) just in case
+                max_l = max(lengths)
+                
+                # Generate 100 points for a smooth curve
+                step = (max_l - min_l) / 100.0
+                if step > 0:
+                    curve_x = [min_l + i * step for i in range(101)]
+                    
+                    # Apply the power-law equation: W = exp(intercept + slope * ln(L))
+                    curve_y = [math.exp(intercept + slope * math.log(x)) for x in curve_x]
+                    
+                    # Plot the theoretical line (solid red line, thickness 2)
+                    self.LWPlot.plot(curve_x, curve_y, pen=pg.mkPen(color='r', width=2))
+
+        # ==========================================
+        # PLOT 2: OTOLITH FREQUENCY (Entire Survey)
+        # ==========================================
+        # Notice we omit 'event_id' here to grab data for the entire survey
+        sql_oto = (f"SELECT {length_col}, alpha_barcode FROM {self.parent().schema}.v_specimen_measurements "
+                   f"WHERE ship = {self.parent().ship} AND survey = {self.parent().survey} "
+                   f"AND species_code = {self.parent().activeSpcCode} "
+                   f"AND {length_col} IS NOT NULL")
+                   
+        query_oto = self.parent().db.dbQuery(sql_oto)
+
+        # Initialize dictionaries to hold our counts for each bin
+        len_only_counts = {b: 0 for b in bins}
+        oto_counts = {b: 0 for b in bins}
+
+        for row in query_oto:
+            length_val = float(row[0])
+            barcode = row[1]
+            
+            # Replicate R's cut() function by flooring to the nearest bin step
+            bin_val = int((length_val // bin_step) * bin_step)
+            
+            if bin_val in bins:
+                if barcode: 
+                    # Has a barcode -> It's an Otolith
+                    oto_counts[bin_val] += 1
+                else: 
+                    # No barcode -> It's just a Length
+                    len_only_counts[bin_val] += 1
+
+        self.OtoLengthPlot.clear()
+        
+        # Add a legend if it doesn't already exist
+        if self.OtoLengthPlot.plotItem.legend is None:
+            legend = self.OtoLengthPlot.addLegend()
+        else:
+            legend = self.OtoLengthPlot.plotItem.legend
+            legend.clear()
+
+        # Anchor the top-right of the legend (1, 0) to the top-right of the plot (1, 0)
+        # The offset=(-10, 10) gives it a nice 10-pixel padding from the very edge
+        legend.anchor((1, 0), (1, 0), offset=(-10, 10))
+
+        # Extract data into lists for plotting
+        x_vals = list(oto_counts.keys())
+        oto_y = list(oto_counts.values())
+        
+        # To mimic a stacked bar chart, the background bar must be the TOTAL height
+        total_y = [len_only_counts[x] + oto_counts[x] for x in x_vals]
+
+        # Draw the total (Lengths + Otoliths) as dark grey in the back
+        bg_total = pg.BarGraphItem(x=x_vals, height=total_y, width=bin_step*0.9, brush='black', name='Lengths')
+        self.OtoLengthPlot.addItem(bg_total)
+        
+        # Draw the Otoliths as black in the front
+        bg_oto = pg.BarGraphItem(x=x_vals, height=oto_y, width=bin_step*0.9, brush='darkgray', name='Otoliths')
+        self.OtoLengthPlot.addItem(bg_oto)
+
+# --- ADD THE HORIZONTAL LINE ---
+        # pos=50 sets the Y intercept. angle=0 makes it horizontal.
+        # We use a dashed red line (style=Qt.PenStyle.DashLine) so it is highly visible.
+        hline = pg.InfiniteLine(pos=50, angle=0, pen=pg.mkPen('r', width=2, style=Qt.PenStyle.DashLine))
+        self.OtoLengthPlot.addItem(hline)
+        
 class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
     '''CLAMSSpecimen presents the CLAMS specimen form.  The specimen form is used
     to collect and store measurements on specimens based on protocols defined in
     the database.
     '''
+
+    def showPlots(self):
+        '''showPlots is called when the plotsView button is clicked. 
+        It initializes and presents the plots dialog.
+        '''
+        plots_dialog = SpecPlotsDialog(self)
+        plots_dialog.exec()
 
     def __init__(self, parent=None):
         '''The CLAMS specimen dialog initialization method. Gets basic information
@@ -88,6 +277,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.freeze=False
         self.schema = parent.schema
         self.length_types = parent.length_types
+        self.plotsView.clicked.connect(self.showPlots)
 
         if not self.db.db.isOpen():
             self.db.dbOpen()
@@ -218,7 +408,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.addspcBtn.clicked.connect(self.getSpecies)
         self.cycleBtn.clicked.connect(self.getNext)
         self.deleteBtn.clicked.connect(self.goDelete)
-        self.collectBtn.clicked.connect(self.getCollections)
+        #self.collectBtn.clicked.connect(self.getCollections)
         self.doneBtn.clicked.connect(self.close)
         self.protoBtn.clicked.connect(self.getProtocol)
         self.selModel.selectionChanged.connect(self.getEditSel)
@@ -226,6 +416,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.commentBtn.clicked.connect(self.getComment)
         self.samplingMethodBox.activated[int].connect(self.editSamplingMethod)
         self.lengthTypeBox.activated[int].connect(self.lengthTypeChanged)
+        self.lwOnlyCheckBox.stateChanged.connect(self.toggleLWOnly)
+
 
         #  Connect up slots for protocol buttons
         for btn in self.buttons:
@@ -270,13 +462,15 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.protoBtn.setEnabled(enabled)
         self.deleteBtn.setEnabled(enabled)
         self.commentBtn.setEnabled(enabled)
-        self.collectBtn.setEnabled(enabled)
+        #self.collectBtn.setEnabled(enabled)
         self.printBtn.setEnabled(enabled)
         self.measureView.setEnabled(enabled)
-
+        self.plotsView.setEnabled(enabled)
+        self.plotsView.show()
+        
         if 'nwfsc' in self.settings['OrganizationName'].lower() or \
                 'swfsc' in self.settings['OrganizationName'].lower():
-            self.collectBtn.hide()
+            #self.collectBtn.hide()
             self.printBtn.setText('Print Label')
 
 
@@ -299,6 +493,39 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         # Use this to re-inforce the new length type policy
         QMessageBox.information(self, "Length Measurement Type", "<font size = 12>You should now measure " +lengthType)
 
+    def toggleLWOnly(self):
+        '''Overrides the protocol to only require Length and Weight when checked.'''
+        if not hasattr(self, 'measureType') or not self.measureType:
+            return 
+
+        checked = self.lwOnlyCheckBox.isChecked()
+
+        for i in self.iterator:
+            m_type = self.measureType[i].lower()
+            is_lw = (m_type in self.length_types) or ('length' in m_type) or ('weight' in m_type)
+
+            if checked:
+                if not is_lw:
+                    self.forcing[i] = '0'
+                else:
+                    self.forcing[i] = '1' # Guarantee length and weight are strictly required
+            else:
+                self.forcing[i] = self.origForcing[i]
+
+        # FIX FOR AUTO NEXT: 
+        if checked:
+            self.autoCheck.setEnabled(True)
+        else:
+            if '0' in self.forcing:
+                # Force the checkbox to uncheck before graying it out!
+                self.autoCheck.setChecked(False)
+                self.autoCheck.setEnabled(False)
+            else:
+                self.autoCheck.setEnabled(True)
+
+        # Trigger checkConditionals to immediately update button states
+        self.checkConditionals()
+        self.resetColors()
 
     def getSpecies(self):
         '''getSpecies is called when initializing the module and then when the new species button is pressed.
@@ -1031,7 +1258,7 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                                      f"measurement_type, device_id, measurement_value) VALUES ({self.ship}, "
                                      f"{self.survey}, {self.activeHaul}, {self.activeSample}, {self.specimenKey}, "
                                      f"'{measure_type}', {device_id}, '{value}')")
-                        self.db.dbE(query_txt)
+                        self.db.dbExec(query_txt)
 
             else:
                 # overwrite record - UPDATE
@@ -1070,13 +1297,17 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
 
             # check conditionals
             self.checkConditionals()
+            
+            # FIX 1: Change the button color to green BEFORE moving on
+            self.buttons[i].setStyleSheet("background-color: green")
 
             if keepGoing:
                 self.moveOn(i)
+                
+        # If we were in edit mode, ensure the button still turns green
+        if self.editFieldFlag:
+            self.buttons[i].setStyleSheet("background-color: green")
         
-        #  change the button text to green
-        self.buttons[i].setStyleSheet("background-color: green")
-
 
     def moveOn(self, i):
         '''moveOn checks to make sure last measurement has been collected and then
@@ -1116,31 +1347,49 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 condObj = condObj(self.db, self.schema, self.activeSpcCode, self)
                 self.buttonEnable = condObj.evaluate(self.measureType,  self.values, self.buttonEnable)
 
+            # Check if LW Only override is active
+            lw_only_active = hasattr(self, 'lwOnlyCheckBox') and self.lwOnlyCheckBox.isChecked()
+
             for i in self.iterator:
                 btn = self.buttons[i]
-                # added by AB to re-enable buttons that already have measurement
+                
+                m_type = self.measureType[i].lower()
+                is_lw = (m_type in self.length_types) or ('length' in m_type) or ('weight' in m_type)
+
+                # Apply LW Only override before setting button state
+                if lw_only_active:
+                    if not is_lw:
+                        self.buttonEnable[i] = [False, False]
+                    else:
+                        # Force Length and Weight to bypass conditional scripts
+                        self.buttonEnable[i] = [True, True]
+                        self.forcing[i] = '1'
+
+                # Re-enable buttons that already have a measurement
                 if self.values[i] is not None:
                     self.buttonEnable[i][0] = True
 
                 btn.setEnabled(self.buttonEnable[i][0])
+                
+                # Determine and apply the correct background color cleanly
                 if not self.buttonEnable[i][0]:
                     btn.setStyleSheet("background-color: gray")
-
-                # added by AB to reset the button color if the measure is enabled and there is no value yet
-                elif self.buttonEnable[i][0] and self.values[i] is None:
+                    
+                elif self.values[i] is None:
+                    # Update forcing state if conditionals specify it should be forced
+                    if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
+                        if not lw_only_active or is_lw:
+                            self.forcing[i] = '1'
+                            
+                    # Color based on forcing state
                     if self.forcing[i] == '1':
                         btn.setStyleSheet("background-color: red")
                     else:
                         btn.setStyleSheet("background-color: yellow")
-
-                if len(self.buttonEnable[i]) > 1 and self.buttonEnable[i][1]:
-                    self.forcing[i] = '1'
-                    # Only turn the button red if a measurement hasn't been taken yet.
-                    # Otherwise, ensure it stays green.
-                    if self.values[i] is None:
-                        btn.setStyleSheet("background-color: red")
-                    else:
-                        btn.setStyleSheet("background-color: green")
+                        
+                else:
+                    # Measurement exists! No more stuck green colors.
+                    btn.setStyleSheet("background-color: green")
 
 
     def getNext(self, skipChecks=False):
@@ -1191,7 +1440,9 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 sql = ("INSERT INTO " + self.schema + ".overrides (ship,survey,event_id,record_id,table_name," +
                         "scientist,description) VALUES (" + self.ship + ", " + self.survey +
                         "," + self.activeHaul + "," + self.specimenKey + ",'measurements','" +
-                        self.scientist + "','" + missing_measurements_text + "')")
+                        self.scientist + "','" + missing_measurements_text + "') "+
+                        "ON CONFLICT (ship, survey, event_id, record_id, table_name, scientist) " +
+                        "DO UPDATE SET description = EXCLUDED.description, time_stamp = statement_timestamp()")
                 self.db.dbExec(sql)
 
         # make the 'next' sound effect
@@ -1210,6 +1461,11 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         self.specimenLabel.setText('')
         #  reset the button colors
         self.resetColors()
+        
+        # Re-apply the override to ensure the new specimen starts with RED buttons
+        if hasattr(self, 'lwOnlyCheckBox') and self.lwOnlyCheckBox.isChecked():
+            self.toggleLWOnly()
+            
         #  clear the comment
         self.comment=''
         #  reset the editing state
@@ -1274,7 +1530,8 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
         if (self.sqlLengthIndex != None):
             #  create the SQL string based on the current length type
             length_type = str(self.lengthTypeBox.currentText())
-            sqlStringEnd = ' AND ' + length_type + ' IS NOT NULL '
+            # sqlStringEnd = ' AND ' + length_type + ' IS NOT NULL '
+            sqlStringEnd = ' '
             #  insert the current length type
             self.sqlString[self.sqlLengthIndex] = length_type
         else:
@@ -1682,24 +1939,51 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
             self.message.exec()
             return
 
-        #  verify that the user wants to delete the specimen
-        self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
+        # Get available measurements for the specimen
+        measurements = ["Entire Specimen"]
+        sql = (f"SELECT DISTINCT measurement_type FROM {self.schema}.measurements "
+               f"WHERE specimen_id = {self.specimenKey} AND ship={self.ship} "
+               f"AND survey={self.survey} AND event_id={self.activeHaul}")
+        query = self.db.dbQuery(sql)
+        for measurement_type, in query:
+            measurements.append(measurement_type)
+
+        delete_dialog = deletedlg.DeleteDlg(self)
+        delete_dialog.set_delete_options(measurements)
+
+        if delete_dialog.exec():
+            option = delete_dialog.get_selected_option()    
+            if option == "Entire Specimen":
+                self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
                                 " specimen " + self.specimenKey + ", " + self.firstName + "? ", 'choice')
-        if self.message.exec():
-            #  yes - delete the specimen
-            sql = ("DELETE FROM " + self.schema + ".measurements WHERE ship="+self.ship+
-                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = " + self.specimenKey)
-            self.db.dbExec(sql)
-            sql = ("DELETE FROM " + self.schema + ".specimen WHERE ship="+self.ship+
-                    " AND survey="+self.survey+" AND event_id="+self.activeHaul+" AND specimen_id = "+self.specimenKey)
-            self.db.dbExec(sql)
+                if self.message.exec():
+                    # Delete the entire specimen
+                    sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                        f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
+                    sql = (f"DELETE FROM {self.schema}.specimen WHERE specimen_id = {self.specimenKey} "
+                        f"AND ship={self.ship} AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
 
-            #  update the view
-            self.updateMeasureView()
-            self.specimenLabel.setText('')
-            #  reset for the next sample - skip the checks since we're deleting this sample
-            self.getNext(skipChecks=True)
-
+                    #  update the view
+                    self.updateMeasureView()
+                    self.specimenLabel.setText('')
+                    #  reset for the next sample - skip the checks since we're deleting this sample
+                    self.getNext(skipChecks=True)
+            else:
+                self.message.setMessage(self.errorIcons[0], self.errorSounds[0], "Are you sure you want to delete" +
+                                " measurement: " + option + " for specimen: " + self.specimenKey + ", " + 
+                                self.firstName + "? ", 'choice')
+                if self.message.exec():
+                    # Delete selected measurement
+                    sql = (f"DELETE FROM {self.schema}.measurements WHERE specimen_id = {self.specimenKey} "
+                        f"AND measurement_type = '{option}' AND ship={self.ship} "
+                        f"AND survey={self.survey} AND event_id={self.activeHaul}")
+                    self.db.dbExec(sql)
+                    # After deleting a measurement, we need to reload the specimen data
+                    # to reflect the change and avoid state conflicts.
+                    self.selModel.clearSelection()
+                    self.updateMeasureView()
 
     def resetColors(self):
         '''resetColors resets the button colors after a specimen has been taken, deleted, or is being edited
@@ -1767,14 +2051,14 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 content = True
         if content:
             #  there are missing measurements throw up a dialog
-            for i in range(len(self.measureType)):
+            '''for i in range(len(self.measureType)):
                 btn = self.buttons[i]
                 if (self.values[i] == None) and (self.forcing[i] == '1') and (btn.isEnabled()):
                     self.message.setMessage(self.errorIcons[0],self.errorSounds[0], "Dear "+self.firstName+", "+
                                         "Please finish up your current specimen before editing.",'info' )
                     self.message.exec()
                     self.selModel.clearSelection()
-                    return
+                    return'''
 
         #  set the specimen_id and update it on the GUI
         self.specimenKey = str(int(thisSpecimenKey))
@@ -2155,7 +2439,3 @@ class CLAMSSpecimen(QDialog, ui_CLAMSSpecimen.Ui_clamsSpecimen):
                 newSize.setHeight(screenGeometry.height() - newPosition.y() - padding[1])
 
         return [newPosition, newSize]
-
-
-
-

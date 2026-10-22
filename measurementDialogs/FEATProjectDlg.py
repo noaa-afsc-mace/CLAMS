@@ -91,8 +91,8 @@ class FEATProjectDlg(QDialog):
         win_icon.addFile(self.settings['IconDir'] + "/giant_clam.ico")
 
         self.setWindowTitle(title)
-        self.setFixedWidth(350)
-        self.setFixedHeight(300)
+        self.setMinimumWidth(350)
+        self.setMinimumHeight(300)
         self.setWindowIcon(win_icon)
 
         self.overall_layout = QVBoxLayout()
