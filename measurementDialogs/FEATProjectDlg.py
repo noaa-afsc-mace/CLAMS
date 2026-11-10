@@ -91,8 +91,8 @@ class FEATProjectDlg(QDialog):
         win_icon.addFile(self.settings['IconDir'] + "/giant_clam.ico")
 
         self.setWindowTitle(title)
-        self.setFixedWidth(350)
-        self.setFixedHeight(300)
+        self.setMinimumWidth(350)
+        self.setMinimumHeight(300)
         self.setWindowIcon(win_icon)
 
         self.overall_layout = QVBoxLayout()
@@ -111,7 +111,7 @@ class FEATProjectDlg(QDialog):
                 # --> NEW: Create a set to track labels we have already made buttons for
                 seen_labels = set() 
                 
-                # get the label and check if there is a specimen_collection for each protocol
+                # get the label and check if there is a group_collection for each protocol
                 for proto in sp_protos:
                     proto_sql = (f"SELECT label FROM {self.schema}.protocol_definitions WHERE protocol_name='{proto}' "
                                  f"AND measurement_type='group_collection'")
